@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
-import { COURT, COLORS, HORIZON_Y, STAGE_CX, STAGE_W, project } from '../config';
+import { ART_SCALE, COURT, COLORS, HORIZON_Y, STAGE_CX, STAGE_W, project } from '../config';
 import { CAM_BASE_Y } from '../fx/CameraDirector';
+import { FAN_VARIANTS } from '../core/characters';
+import { PIXEL_FONT } from '../core/fonts';
 
 /**
  * Escenario de playa compartido por todos los deportes.
@@ -9,20 +11,17 @@ import { CAM_BASE_Y } from '../fx/CameraDirector';
  */
 
 interface Layer { c: Phaser.GameObjects.Container; sx: number; sy: number; pinBottom?: boolean }
-interface Fan { s: Phaser.GameObjects.Image; baseY: number; phase: number; keyA: string; keyB: string; amp: number; up: number }
+interface Fan { s: Phaser.GameObjects.Sprite; baseY: number; phase: number; sign: boolean; amp: number; up: number }
 
 export class BeachStage {
   layers: Layer[] = [];
   fans: Fan[] = [];
   fg: Fan[] = [];
-  private gulls: { s: Phaser.GameObjects.Image; vx: number; baseY: number; ph: number }[] = [];
-  private clouds: Phaser.GameObjects.Image[] = [];
+  private gulls: { s: Phaser.GameObjects.Sprite; vx: number; baseY: number; ph: number }[] = [];
   private sparkles: Phaser.GameObjects.Image[] = [];
   private flags: { s: Phaser.GameObjects.Image; ph: number }[] = [];
   private palms: Phaser.GameObjects.Image[] = [];
   private rays!: Phaser.GameObjects.Image;
-  private boat!: Phaser.GameObjects.Image;
-  private foam!: Phaser.GameObjects.Graphics;
   excitement = 0; // 0..1
   private courtG!: Phaser.GameObjects.Graphics;
   private netG!: Phaser.GameObjects.Graphics;
@@ -41,73 +40,49 @@ export class BeachStage {
 
   private build() {
     const s = this.scene;
-    // --- cielo (capa infinita)
+    // --- cielo de fondo (color de la fila superior del fondo pixel art)
     const sky = this.layer(0, 0, 0);
-    sky.add(s.add.image(STAGE_CX, CAM_BASE_Y - 120, 'sky').setDisplaySize(4200, 1400));
-    // sol + rayos
-    const sunL = this.layer(0.04, 0.1, 1);
-    this.rays = s.add.image(STAGE_CX - 120, 40, 'rays').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.55).setScale(1.6);
-    sunL.add(this.rays);
-    sunL.add(s.add.image(STAGE_CX - 120, 40, 'sun').setScale(1.3).setBlendMode(Phaser.BlendModes.ADD));
-    // nubes
-    const cl = this.layer(0.1, 0.2, 2);
-    for (let i = 0; i < 9; i++) {
-      const c = s.add.image(STAGE_CX - 1500 + i * 380 + Math.random() * 120, 30 + Math.random() * 160, `cloud${i % 3}`).setScale(0.7 + Math.random() * 0.6).setAlpha(0.95);
-      this.clouds.push(c);
-      cl.add(c);
+    sky.add(s.add.rectangle(STAGE_CX, CAM_BASE_Y, 6000, 3000, 0x6d96cd));
+    // --- fondo tropical pixel art (imagen del usuario a resolución nativa, escalada sin filtrado)
+    const bd = this.layer(0.3, 0.42, 2);
+    const BDS = 7.2; // escala: 1 píxel de arte = 7,2 px de mundo
+    const bdTop = HORIZON_Y - 47.5 * BDS;
+    const bdW = 250 * BDS;
+    for (const k of [-1, 0, 1]) {
+      // copias en espejo a los lados: el paneo nunca deja ver el borde
+      const im = s.add.image(STAGE_CX + k * bdW, bdTop, 'backdrop').setOrigin(0.5, 0).setScale(BDS).setFlipX(k !== 0);
+      bd.add(im);
     }
-    // gaviotas
-    const gl = this.layer(0.2, 0.25, 3);
-    for (let i = 0; i < 7; i++) {
-      const g = s.add.image(STAGE_CX - 900 + Math.random() * 1800, 40 + Math.random() * 150, 'gull').setScale(0.6 + Math.random() * 0.5);
+    const sunX = STAGE_CX - bdW / 2 + 58 * BDS, sunY = bdTop + 18 * BDS;
+    this.rays = s.add.image(sunX, sunY, 'rays').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.35).setScale(1.5);
+    bd.add(this.rays);
+    for (let i = 0; i < 46; i++) {
+      // destellos del sol sobre el agua
+      const near = Math.random() < 0.65;
+      const x = near ? sunX + (Math.random() - 0.3) * 520 : STAGE_CX + (Math.random() - 0.5) * 1700;
+      const y = HORIZON_Y + 4 + Math.random() * 13 * BDS;
+      const sp = s.add.image(x, y, 'square').setScale(Math.random() < 0.3 ? 1.6 : 1).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+      this.sparkles.push(sp);
+      bd.add(sp);
+    }
+    // gaviotas pixel art
+    const gl = this.layer(0.22, 0.3, 3);
+    for (let i = 0; i < 6; i++) {
+      const g = s.add.sprite(STAGE_CX - 900 + Math.random() * 1800, -20 + Math.random() * 170, 'gullpx', 'a').setScale(3 + Math.random() * 1.5);
       this.gulls.push({ s: g, vx: 20 + Math.random() * 30, baseY: g.y, ph: Math.random() * 6 });
       gl.add(g);
     }
-    // mar
-    const sea = this.layer(0.3, 0.45, 4);
-    sea.add(s.add.image(STAGE_CX, HORIZON_Y + 70, 'sea').setDisplaySize(4600, 150));
-    sea.add(s.add.image(STAGE_CX + 650, HORIZON_Y - 18, 'island').setScale(1.4, 0.7).setAlpha(0.8));
-    this.boat = s.add.image(STAGE_CX - 60, HORIZON_Y + 4, 'boat').setScale(0.55);
-    sea.add(this.boat);
-    for (let i = 0; i < 70; i++) {
-      // reflejo del sol en el agua: más brillos cerca del eje del sol
-      const spread = Math.random() < 0.6 ? 300 : 1800;
-      const sp = s.add.image(STAGE_CX - 120 + (Math.random() - 0.5) * spread * 2, HORIZON_Y + 6 + Math.random() * 120, 'sparkle')
-        .setBlendMode(Phaser.BlendModes.ADD).setScale(0.4 + Math.random() * 0.6).setAlpha(Math.random());
-      this.sparkles.push(sp);
-      sea.add(sp);
-    }
-    this.foam = s.add.graphics();
-    sea.add(this.foam);
 
-    // playa lejana con sombrillas, hamacas y bañistas
-    const far = this.layer(0.42, 0.6, 5);
-    const farSand = s.add.graphics();
-    farSand.fillStyle(0xf3dcaa, 1).fillRect(STAGE_CX - 2600, HORIZON_Y + 140, 5200, 400);
-    farSand.fillStyle(0xe9cf98, 1).fillRect(STAGE_CX - 2600, HORIZON_Y + 140, 5200, 8);
-    far.add(farSand);
-    for (let i = 0; i < 16; i++) {
-      const ux = STAGE_CX - 1800 + i * 240 + Math.random() * 80;
-      far.add(s.add.image(ux, HORIZON_Y + 150, 'umbrella').setScale(0.75));
-      if (Math.random() < 0.7) far.add(s.add.image(ux + 30, HORIZON_Y + 175, 'chair').setScale(0.8));
-      if (Math.random() < 0.6) far.add(s.add.image(ux - 30, HORIZON_Y + 170, `fan${Math.floor(Math.random() * 14)}a`).setScale(0.45));
-    }
-
-    // farolas y palmeras traseras
+    // farolas
     const back = this.layer(0.64, 0.85, 6);
     for (const px of [-11.5, 11.5]) {
       const p = project(px, 0, COURT.fenceZ + 0.6);
       const pole = s.add.graphics();
-      pole.fillStyle(0x6a7380, 1).fillRect(p.x - 4, p.y - 420, 8, 420);
-      pole.fillStyle(0x4a525c, 1).fillRect(p.x - 26, p.y - 432, 52, 18);
-      pole.fillStyle(0xfff8d0, 1).fillRect(p.x - 22, p.y - 418, 44, 5);
+      pole.fillStyle(0x5a6270, 1).fillRect(p.x - 5, p.y - 420, 10, 420);
+      pole.fillStyle(0x8a94a4, 1).fillRect(p.x - 5, p.y - 420, 3, 420);
+      pole.fillStyle(0x3a404c, 1).fillRect(p.x - 30, p.y - 436, 60, 22);
+      pole.fillStyle(0xfff4c0, 1).fillRect(p.x - 26, p.y - 418, 52, 6);
       back.add(pole);
-    }
-    for (const [px, key, sc] of [[-17, 'palm', 1.05], [16.5, 'palmR', 1.1], [-26, 'palm', 0.9], [25, 'palmR', 0.95]] as [number, string, number][]) {
-      const p = project(px, 0, COURT.fenceZ + 2);
-      const palm = s.add.image(p.x, p.y + 10, key).setOrigin(key === 'palm' ? 0.2 : 0.8, 1).setScale(sc);
-      this.palms.push(palm);
-      back.add(palm);
     }
 
     // banderines (de farola a farola)
@@ -144,15 +119,16 @@ export class BeachStage {
         // hueco para el marcador detrás de la red
         if (r.z < COURT.fenceZ + 0.8 && wx > 0.6 && wx < 3.4) continue;
         const p = project(wx, 0, r.z);
-        const idx = Math.floor(Math.random() * 14);
-        const im = s.add.image(p.x, p.y, `fan${idx}a`).setOrigin(0.5, 1).setScale(r.sc * (0.9 + Math.random() * 0.2));
+        const idx = Math.floor(Math.random() * FAN_VARIANTS);
+        const im = s.add.sprite(p.x, p.y, `fan${idx}`, 'a').setOrigin(0.5, 0.97).setScale(ART_SCALE * p.k * 1.25 * (0.92 + Math.random() * 0.16));
+        if (Math.random() < 0.5) im.setFlipX(true);
         crowd.add(im);
-        this.fans.push({ s: im, baseY: p.y, phase: Math.random() * 10, keyA: `fan${idx}a`, keyB: `fan${idx}b`, amp: 1 + Math.random() * 2, up: 0 });
+        this.fans.push({ s: im, baseY: p.y, phase: Math.random() * 10, sign: idx % 4 === 0, amp: 1 + Math.random() * 2, up: 0 });
       }
     }
     for (const wx of [-4.5, 2.8, 6.5]) {
       const p = project(wx, 0, COURT.fenceZ + 0.4);
-      crowd.add(s.add.image(p.x, p.y, 'dog').setOrigin(0.5, 1).setScale(0.8));
+      crowd.add(s.add.image(p.x, p.y, 'dogpx').setOrigin(0.5, 1).setScale(ART_SCALE * p.k * 1.1).setFlipX(wx > 0));
     }
     // marcador de madera detrás de la red
     const bp = project(2, 0, COURT.fenceZ + 0.45);
@@ -162,7 +138,7 @@ export class BeachStage {
     board.fillStyle(0xf5ecd8, 1).fillRoundedRect(bp.x - 44, bp.y - 112, 40, 40, 4).fillRoundedRect(bp.x + 4, bp.y - 112, 40, 40, 4);
     crowd.add(board);
     for (let i = 0; i < 2; i++) {
-      const t = s.add.text(bp.x - 24 + i * 48, bp.y - 92, '0', { fontFamily: 'Lilita One, Arial Black, sans-serif', fontSize: '32px', color: i === 0 ? '#e0611a' : '#14858c' }).setOrigin(0.5);
+      const t = s.add.text(bp.x - 24 + i * 48, bp.y - 92, '0', { fontFamily: PIXEL_FONT, fontSize: '26px', color: i === 0 ? '#e0611a' : '#14858c' }).setOrigin(0.5);
       this.boardTexts.push(t);
       crowd.add(t);
     }
@@ -180,13 +156,13 @@ export class BeachStage {
 
     const fgL = this.layer(1.28, 1.08, 600);
     this.layers[this.layers.length - 1].pinBottom = true; // siempre pegadas al borde inferior de la pantalla
-    for (let i = 0; i < 26; i++) {
-      const v = Math.floor(Math.random() * 4);
-      const x = STAGE_CX - 1700 + i * 135 + Math.random() * 40;
-      const y = 800 + Math.random() * 25;
-      const im = s.add.image(x, y, `sil${v}a`).setOrigin(0.5, 1).setScale(0.62 + Math.random() * 0.2);
+    for (let i = 0; i < 30; i++) {
+      const v = Math.floor(Math.random() * 6);
+      const x = STAGE_CX - 1700 + i * 118 + Math.random() * 40;
+      const y = 802 + Math.random() * 25;
+      const im = s.add.sprite(x, y, `sil${v}`, 'a').setOrigin(0.5, 1).setScale(1.9 + Math.random() * 0.45);
       fgL.add(im);
-      this.fg.push({ s: im, baseY: y, phase: Math.random() * 10, keyA: `sil${v}a`, keyB: `sil${v}b`, amp: 2 + Math.random() * 3, up: 0 });
+      this.fg.push({ s: im, baseY: y, phase: Math.random() * 10, sign: false, amp: 2 + Math.random() * 3, up: 0 });
     }
     // banda de arena/sombra inferior para tapar el borde
     const band = s.add.graphics();
@@ -218,37 +194,48 @@ export class BeachStage {
     const P = (x: number, y: number, z: number) => project(x, y, z);
     // valla del fondo: cristal abajo + malla arriba
     const fz = COURT.fenceZ, fx = COURT.fenceX;
-    // cristales del fondo
-    for (let x = -fx; x < fx - 0.01; x += 2.65) {
-      const a = P(x, 0, fz), b = P(x + 2.65, 0, fz), at = P(x, 2.1, fz), bt = P(x + 2.65, 2.1, fz);
-      g.fillStyle(0xbfe6f5, 0.16);
-      g.fillPoints([at, bt, b, a].map((p) => new Phaser.Math.Vector2(p.x, p.y)), true);
-      g.lineStyle(3, 0xffffff, 0.22);
-      g.lineBetween(at.x + 20, at.y + 8, at.x + 60, a.y - 6);
-      g.lineBetween(at.x + 40, at.y + 8, at.x + 70, at.y + 40);
-    }
-    // malla superior
+    // fondo abierto en el centro (como en el vídeo): cristal + malla sólo en las esquinas
+    const segs: [number, number][] = [[-fx, -5.3], [5.3, fx]];
     const mt = 3.9;
-    g.lineStyle(1, 0x30343a, 0.55);
-    for (let x = -fx; x <= fx; x += 0.35) {
-      const a = P(x, 2.1, fz), b = P(x, mt, fz);
-      g.lineBetween(a.x, a.y, b.x, b.y);
+    for (const [x0, x1] of segs) {
+      const n = Math.max(1, Math.round((x1 - x0) / 2.65));
+      const step = (x1 - x0) / n;
+      for (let i = 0; i < n; i++) {
+        const x = x0 + i * step;
+        const a = P(x, 0, fz), b = P(x + step, 0, fz), at = P(x, 2.1, fz), bt = P(x + step, 2.1, fz);
+        g.fillStyle(0xbfe6f5, 0.14);
+        g.fillPoints([at, bt, b, a].map((p) => new Phaser.Math.Vector2(p.x, p.y)), true);
+        g.lineStyle(3, 0xffffff, 0.25);
+        g.lineBetween(at.x + 16, at.y + 8, at.x + 50, a.y - 6);
+      }
+      g.lineStyle(1, 0x404a56, 0.35);
+      for (let x = x0; x <= x1 + 0.01; x += 0.45) {
+        const a = P(x, 2.1, fz), b = P(x, mt, fz);
+        g.lineBetween(a.x, a.y, b.x, b.y);
+      }
+      for (let y = 2.1; y <= mt; y += 0.45) {
+        const a = P(x0, y, fz), b = P(x1, y, fz);
+        g.lineBetween(a.x, a.y, b.x, b.y);
+      }
+      g.lineStyle(5, 0x2b3038, 1);
+      for (let i = 0; i <= n; i++) {
+        const x = x0 + i * step;
+        const a = P(x, 0, fz), b = P(x, mt, fz);
+        g.lineBetween(a.x, a.y, b.x, b.y);
+      }
+      for (const y of [2.1, mt]) {
+        const a = P(x0, y, fz), b = P(x1, y, fz);
+        g.lineBetween(a.x, a.y, b.x, b.y);
+      }
     }
-    for (let y = 2.1; y <= mt; y += 0.3) {
-      const a = P(-fx, y, fz), b = P(fx, y, fz);
-      g.lineBetween(a.x, a.y, b.x, b.y);
+    // valla baja de madera/lona en el centro abierto
+    {
+      const a = P(-5.3, 0, fz), b = P(5.3, 0, fz), at = P(-5.3, 0.7, fz), bt = P(5.3, 0.7, fz);
+      g.fillStyle(0x2a6fd6, 0.9).fillPoints([at, bt, b, a].map((p) => new Phaser.Math.Vector2(p.x, p.y)), true);
+      g.fillStyle(0xffffff, 0.9).fillRect(at.x, at.y, bt.x - at.x, 3);
     }
-    // postes y marcos
-    g.lineStyle(5, 0x2b3038, 1);
-    for (let x = -fx; x <= fx + 0.01; x += 2.65) {
-      const a = P(x, 0, fz), b = P(x, mt, fz);
-      g.lineBetween(a.x, a.y, b.x, b.y);
-    }
-    const r0 = P(-fx, 2.1, fz), r1 = P(fx, 2.1, fz), t0 = P(-fx, mt, fz), t1 = P(fx, mt, fz);
-    g.lineBetween(r0.x, r0.y, r1.x, r1.y);
-    g.lineBetween(t0.x, t0.y, t1.x, t1.y);
     // carteles en el cristal
-    for (const x of [-8.5, -3.2, 5.5]) {
+    for (const x of [-8.6, 6.6]) {
       const a = P(x, 0.25, fz), b = P(x + 1.6, 0.85, fz);
       g.fillStyle(0xf4f8ff, 0.95).fillRect(a.x, b.y, b.x - a.x, a.y - b.y);
       g.lineStyle(3, 0x2a7fd6, 1);
@@ -356,34 +343,18 @@ export class BeachStage {
   update(dt: number, time: number) {
     const t = time / 1000;
     this.rays.rotation += dt * 0.03;
-    this.rays.setAlpha(0.45 + Math.sin(t * 0.8) * 0.12);
-    for (const c of this.clouds) {
-      c.x += dt * 6;
-      if (c.x > STAGE_CX + 1800) c.x = STAGE_CX - 1800;
-    }
+    this.rays.setAlpha(0.3 + Math.sin(t * 0.8) * 0.1);
     for (const g of this.gulls) {
       g.s.x += g.vx * dt;
       g.s.y = g.baseY + Math.sin(t * 1.2 + g.ph) * 8;
-      g.s.setTexture(Math.sin(t * 7 + g.ph) > 0 ? 'gull' : 'gull2');
+      g.s.setFrame(Math.sin(t * 7 + g.ph) > 0 ? 'a' : 'b');
       if (g.s.x > STAGE_CX + 1400) g.s.x = STAGE_CX - 1400;
     }
     for (let i = 0; i < this.sparkles.length; i++) {
-      const sp = this.sparkles[i];
-      sp.setAlpha(Math.max(0, Math.sin(t * (1.5 + (i % 5) * 0.7) + i * 1.7)));
+      // destellos "a pasos" (sin fundidos suaves): muy de 16 bits
+      const v = Math.sin(t * (1.5 + (i % 5) * 0.7) + i * 1.7);
+      this.sparkles[i].setAlpha(v > 0.6 ? 1 : v > 0.2 ? 0.5 : 0);
     }
-    this.boat.y = HORIZON_Y + 4 + Math.sin(t * 1.3) * 2;
-    this.boat.rotation = Math.sin(t * 1.1) * 0.04;
-    this.boat.x += dt * 3;
-    // espuma de la orilla
-    this.foam.clear();
-    this.foam.lineStyle(4, 0xffffff, 0.75);
-    const fy = HORIZON_Y + 136 + Math.sin(t * 0.9) * 5;
-    this.foam.beginPath();
-    for (let x = -2300; x <= 2300; x += 40) {
-      const y = fy + Math.sin(x * 0.01 + t * 1.5) * 3;
-      if (x === -2300) this.foam.moveTo(STAGE_CX + x, y); else this.foam.lineTo(STAGE_CX + x, y);
-    }
-    this.foam.strokePath();
     for (const f of this.flags) f.s.rotation = Math.sin(t * 3 + f.ph) * 0.25;
     for (let i = 0; i < this.palms.length; i++) this.palms[i].rotation = Math.sin(t * 0.6 + i) * 0.015;
 
@@ -393,9 +364,13 @@ export class BeachStage {
       for (const f of group) {
         if (f.up > 0) f.up -= dt;
         const up = f.up > 0;
-        f.s.setTexture(up ? f.keyB : f.keyA);
+        const isSil = group === this.fg;
+        if (isSil) f.s.setFrame(up ? 'b' : 'a');
+        else f.s.setFrame(up ? (f.sign ? 'd' : Math.sin(t * 9 + f.phase) > 0 ? 'b' : 'c') : 'a');
         const jump = up ? Math.abs(Math.sin(t * 9 + f.phase)) * 10 * f.amp * 0.6 : 0;
-        f.s.y = f.baseY - Math.abs(Math.sin(t * 2 + f.phase)) * f.amp - jump;
+        // movimiento a saltos de 1 px de arte
+        const bob = Math.round(Math.abs(Math.sin(t * 2 + f.phase)) * f.amp);
+        f.s.y = f.baseY - bob - jump;
       }
     }
   }

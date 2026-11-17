@@ -8,6 +8,10 @@ export const STAGE_W = 2800;
 export const STAGE_CX = STAGE_W / 2;
 
 export const PPM = 58; // píxeles por metro a z=0
+/** Píxeles de mundo por cada píxel de arte de los sprites (a z=0). */
+export const ART_SCALE = 2.6;
+/** Tamaño del píxel retro en pantalla (px de canvas) para el shader. */
+export const RETRO_ROWS = 250;
 export const GROUND_NEAR_Y = 640; // y en pantalla de la línea cercana (z=0)
 export const DEPTH_PX_PER_M = 22; // cuánto "sube" el suelo por metro de profundidad
 export const PERSPECTIVE = 0.03; // reducción de escala por metro de profundidad

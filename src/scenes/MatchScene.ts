@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { COURT, PHYS, PPM, VIEW_W, project, view } from '../config';
+import { COURT, PHYS, PPM, RETRO_ROWS, VIEW_W, project, view } from '../config';
+import { applyRetro } from '../fx/RetroPipeline';
 import { sfx } from '../core/audio';
 import { playerInput } from '../core/input';
 import { AI_LEVELS, AiController } from '../entities/Ai';
@@ -63,7 +64,7 @@ export class MatchScene extends Phaser.Scene {
     this.stage = new BeachStage(this);
     this.stage.buildNet();
     this.ball = new Ball(this);
-    this.p1 = new Player(this, -1, 'sun', this.cfg.mode === 'play' ? 'TÚ' : 'SOL');
+    this.p1 = new Player(this, -1, 'sun', this.cfg.mode === 'play' ? 'TU' : 'SOL');
     this.p2 = new Player(this, 1, 'wave', 'CPU');
     const lvl = AI_LEVELS[this.cfg.difficulty];
     if (this.cfg.mode === 'attract') this.ai.set(-1, new AiController(this.p1, AI_LEVELS.dificil));
@@ -71,7 +72,8 @@ export class MatchScene extends Phaser.Scene {
     if (this.cfg.mode === 'attract') { this.p1.meter = 0.6; this.p2.meter = 0.8; }
     this.fx = new Effects(this);
     this.dir = new CameraDirector(this.cameras.main);
-    this.cameras.main.setBackgroundColor('#8cc8f0');
+    this.cameras.main.setBackgroundColor('#5c8ad1');
+    applyRetro(this.cameras.main, RETRO_ROWS);
     this.stage.setScore(0, 0);
     this.setupServe(Math.random() < 0.5 ? -1 : 1);
     playerInput.reset();
@@ -101,8 +103,12 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
+  private face(side: Side, expr: number, dur = 1.2) { this.game.events.emit('face', { side, expr, dur }); }
+
   private pointWon(winner: Side, reason: 'in' | 'out' | 'net' | 'own-side' | 'unstoppable') {
     if (this.state !== 'rally') return;
+    this.face(winner, 2, 2.4);
+    this.face(winner === -1 ? 1 : -1, 5, 2.4);
     this.state = 'point';
     this.stateT = 0;
     this.stats.longestRally = Math.max(this.stats.longestRally, this.rallyHits);
@@ -304,6 +310,8 @@ export class MatchScene extends Phaser.Scene {
     this.fx.powerBurst(p.theme, pp.x, pp.y);
     sfx.powerUp();
     this.stage.cheer(0.5);
+    this.face(p.side, 3, 1.6);
+    this.face(p.side === -1 ? 1 : -1, 4, 1.6);
     // mini-cinemática: punch-in sobre el jugador + cámara lenta breve
     this.slowmo(0.3, 0.45);
     this.dir.cut({ x: pp.x + p.facing * 60, y: pp.y - 70, zoom: this.baseZoom() * 1.18, panTime: 0.2, zoomTime: 0.18, priority: 2, duration: 0.5 }, this.now);
@@ -337,6 +345,7 @@ export class MatchScene extends Phaser.Scene {
       this.dir.shake(180, 0.006);
       b.lastHitter = p.side === -1 ? 1 : -1; // sigue su camino
       this.fx.floatText(bp.x, bp.y - 80, '¡NO PUEDE!', '#ffffff', 30);
+      this.face(p.side, 4, 1.4);
       return;
     }
 
@@ -382,9 +391,11 @@ export class MatchScene extends Phaser.Scene {
       this.dir.shake(160, 0.004);
       this.stage.cheer(0.8);
       this.fx.floatText(bp.x, bp.y - 90, SPECIAL_NAME[p.theme], p.theme === 'sun' ? '#ffb020' : '#5ff0ff', 42);
+      this.face(p.side, 3, 1.4);
     } else {
       sfx.hit(kind === 'smash' ? 1 : kind === 'drive' ? 0.7 : 0.4);
       this.fx.hitSpark(bp.x, bp.y, kind === 'smash' || perfect);
+      if (kind === 'smash' || perfect) this.face(p.side, 1, 0.8);
       if (kind === 'smash') {
         this.dir.kick(0.045);
         this.dir.shake(120, 0.003);

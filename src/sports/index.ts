@@ -11,6 +11,6 @@ export function beachPaddle(points = 7): SportRules {
 
 export const SPORTS = [
   { id: 'palas', name: 'PALAS', available: true },
-  { id: 'voley', name: 'VÓLEY PLAYA', available: false },
-  { id: 'futvoley', name: 'FUTVÓLEY', available: false },
+  { id: 'voley', name: 'VOLEY PLAYA', available: false },
+  { id: 'futvoley', name: 'FUTVOLEY', available: false },
 ];

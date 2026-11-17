@@ -1,6 +1,7 @@
-node_modules
-dist
+*.log
 .env
 .env.local
 .firebase
-*.log
+dist
+dist-artifact
+node_modules

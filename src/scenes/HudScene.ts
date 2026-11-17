@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { sfx } from '../core/audio';
 import { playerInput } from '../core/input';
+import { applyRetro } from '../fx/RetroPipeline';
 
-const FONT = 'Lilita One, Arial Black, sans-serif';
+import { PIXEL_FONT as FONT } from '../core/fonts';
 
 interface Btn { c: Phaser.GameObjects.Container; r: number; key: 'hit' | 'jump' | 'special'; ring: Phaser.GameObjects.Arc; pid: number }
 
@@ -23,6 +24,7 @@ export class HudScene extends Phaser.Scene {
   private meterVals = { a: 0, b: 0, pa: false, pb: false };
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private touch = false;
+  private faces: { img: Phaser.GameObjects.Image; base: number; until: number }[] = [];
 
   constructor() { super('Hud'); }
 
@@ -36,7 +38,7 @@ export class HudScene extends Phaser.Scene {
       rotate: { start: 0, end: 720 }, scaleX: { start: 1.2, end: 0.4 }, scaleY: { min: 0.5, max: 1.4 },
       tint: [0xff5a5a, 0xffd23f, 0x3ab0ff, 0x7bd389, 0xff9f1c, 0xc77dff, 0xffffff], emitting: false,
     }).setDepth(50);
-    this.hint = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '26px', color: '#ffffff', stroke: '#1d2a3a', strokeThickness: 6 }).setOrigin(0.5).setDepth(40);
+    this.hint = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '16px', color: '#ffffff', stroke: '#1d2a3a', strokeThickness: 4 }).setOrigin(0.5).setDepth(40);
 
     const kb = this.input.keyboard!;
     this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,SPACE,SHIFT') as any;
@@ -50,8 +52,10 @@ export class HudScene extends Phaser.Scene {
     const onHud = (d: any) => this.onHud(d);
     const onPoint = (d: any) => this.onPoint(d);
     const onOver = (d: any) => this.onOver(d);
-    ev.on('hud', onHud); ev.on('point', onPoint); ev.on('match-over', onOver);
-    this.events.once('shutdown', () => { ev.off('hud', onHud); ev.off('point', onPoint); ev.off('match-over', onOver); });
+    const onFace = (d: { side: number; expr: number; dur: number }) => this.setFace(d.side, d.expr, d.dur);
+    ev.on('hud', onHud); ev.on('point', onPoint); ev.on('match-over', onOver); ev.on('face', onFace);
+    this.events.once('shutdown', () => { ev.off('hud', onHud); ev.off('point', onPoint); ev.off('match-over', onOver); ev.off('face', onFace); });
+    applyRetro(this.cameras.main, 360);
     this.scale.on('resize', this.layout, this);
     this.events.once('shutdown', () => this.scale.off('resize', this.layout, this));
     this.layout();
@@ -66,18 +70,30 @@ export class HudScene extends Phaser.Scene {
     bg.fillStyle(0x25c4c4, 1).fillRoundedRect(46, 4, 120, 50, 11);
     c.add(bg);
     this.names = [
-      this.add.text(-106, 30, 'TÚ', { fontFamily: FONT, fontSize: '22px', color: '#fff', stroke: '#7a3a00', strokeThickness: 4 }).setOrigin(0.5),
-      this.add.text(106, 30, 'CPU', { fontFamily: FONT, fontSize: '22px', color: '#fff', stroke: '#0b4a5a', strokeThickness: 4 }).setOrigin(0.5),
+      this.add.text(-106, 30, 'TU', { fontFamily: FONT, fontSize: '12px', color: '#fff', stroke: '#7a3a00', strokeThickness: 4 }).setOrigin(0.5),
+      this.add.text(106, 30, 'CPU', { fontFamily: FONT, fontSize: '12px', color: '#fff', stroke: '#0b4a5a', strokeThickness: 4 }).setOrigin(0.5),
     ];
-    this.scoreA = this.add.text(-22, 30, '0', { fontFamily: FONT, fontSize: '36px', color: '#ffd29a' }).setOrigin(0.5);
-    this.scoreB = this.add.text(22, 30, '0', { fontFamily: FONT, fontSize: '36px', color: '#9af5f5' }).setOrigin(0.5);
-    const dash = this.add.text(0, 28, '-', { fontFamily: FONT, fontSize: '30px', color: '#fff' }).setOrigin(0.5);
+    this.scoreA = this.add.text(-22, 30, '0', { fontFamily: FONT, fontSize: '24px', color: '#ffd29a' }).setOrigin(0.5);
+    this.scoreB = this.add.text(22, 30, '0', { fontFamily: FONT, fontSize: '24px', color: '#9af5f5' }).setOrigin(0.5);
+    const dash = this.add.text(0, 28, '-', { fontFamily: FONT, fontSize: '20px', color: '#fff' }).setOrigin(0.5);
     this.meterA = this.add.graphics();
     this.meterB = this.add.graphics();
     c.add([...this.names, this.scoreA, this.scoreB, dash, this.meterA, this.meterB]);
+    // retratos (caras del usuario: 0 normal, 1 esfuerzo, 2 risa, 3 grito, 4 sorpresa, 5 agotado)
+    for (const [i, key, x] of [[0, 'faces_sun', -214], [1, 'faces_wave', 214]] as [number, string, number][]) {
+      const frame = this.add.graphics();
+      frame.fillStyle(0x1d2a3a, 1).fillRect(x - 34, 2, 68, 74);
+      frame.fillStyle(i === 0 ? 0xff8a1f : 0x25c4c4, 1).fillRect(x - 31, 5, 62, 68);
+      frame.fillStyle(0x7fc4ec, 1).fillRect(x - 28, 8, 56, 62);
+      const img = this.add.image(x, 72, key, 0).setOrigin(0.5, 1).setScale(1.35).setFlipX(i === 0);
+      const mask = this.add.graphics().setVisible(false);
+      c.add([frame, img]);
+      this.faces.push({ img, base: 0, until: 0 });
+      void mask;
+    }
     this.panel = c;
 
-    const menu = this.add.text(0, 0, '❚❚', { fontFamily: FONT, fontSize: '26px', color: '#fff', backgroundColor: '#1d2a3acc', padding: { x: 12, y: 6 } })
+    const menu = this.add.text(0, 0, 'II', { fontFamily: FONT, fontSize: '16px', color: '#fff', backgroundColor: '#1d2a3acc', padding: { x: 12, y: 6 } })
       .setDepth(30).setInteractive({ useHandCursor: true }).setName('menuBtn');
     menu.on('pointerdown', () => { sfx.ui(); this.backToMenu(); });
   }
@@ -99,7 +115,7 @@ export class HudScene extends Phaser.Scene {
     const c = this.add.container(0, 0).setDepth(30);
     const ring = this.add.circle(0, 0, r + 6, 0xffffff, 0).setStrokeStyle(5, 0xffffff, 0.0);
     const base = this.add.circle(0, 0, r, col, 0.55).setStrokeStyle(4, 0xffffff, 0.8);
-    const t = this.add.text(0, 0, label, { fontFamily: FONT, fontSize: `${Math.round(r * 0.36)}px`, color: '#fff', stroke: '#1d2a3a', strokeThickness: 4 }).setOrigin(0.5);
+    const t = this.add.text(0, 0, label, { fontFamily: FONT, fontSize: `${Math.max(8, Math.round(r * 0.2))}px`, color: '#fff', stroke: '#1d2a3a', strokeThickness: 4 }).setOrigin(0.5);
     c.add([ring, base, t]);
     const b: Btn = { c, r, key, ring, pid: -1 };
     this.btns.push(b);
@@ -177,6 +193,14 @@ export class HudScene extends Phaser.Scene {
     if (!show) this.hint.setText('Mover: WASD/flechas · Golpe: J/Espacio · Salto: K · Especial: L');
   }
 
+  private setFace(side: number, expr: number, dur: number) {
+    const f = this.faces[side === -1 ? 0 : 1];
+    if (!f) return;
+    f.img.setFrame(expr);
+    f.until = this.time.now + dur * 1000;
+    this.tweens.add({ targets: f.img, y: 66, duration: 70, yoyo: true });
+  }
+
   // ------------------------------------------------------------ eventos
   private onHud(d: any) {
     this.meterVals = { a: d.meterA, b: d.meterB, pa: d.poweredA, pb: d.poweredB };
@@ -201,7 +225,7 @@ export class HudScene extends Phaser.Scene {
     board.add(g);
     const card = (x: number, from: number, to: number, col: string, changed: boolean) => {
       const bgc = this.add.rectangle(x, 0, 116, 128, 0xf5ecd8).setStrokeStyle(3, 0x3e2a17);
-      const t = this.add.text(x, 0, String(from), { fontFamily: FONT, fontSize: '96px', color: col }).setOrigin(0.5);
+      const t = this.add.text(x, 0, String(from), { fontFamily: FONT, fontSize: '60px', color: col }).setOrigin(0.5);
       board.add([bgc, t]);
       if (changed) {
         this.tweens.add({
@@ -234,15 +258,15 @@ export class HudScene extends Phaser.Scene {
     g.fillStyle(0x1d2a3a, 0.92).fillRoundedRect(-260, -150, 520, 300, 24);
     g.lineStyle(5, won ? 0xffc23a : 0x8aa0b8, 1).strokeRoundedRect(-260, -150, 520, 300, 24);
     c.add(g);
-    c.add(this.add.text(0, -88, won ? '¡HAS GANADO!' : 'HAS PERDIDO', { fontFamily: FONT, fontSize: '54px', color: won ? '#ffd23f' : '#ffffff', stroke: '#000', strokeThickness: 6 }).setOrigin(0.5));
-    c.add(this.add.text(0, -18, `${d.score.a}  -  ${d.score.b}`, { fontFamily: FONT, fontSize: '46px', color: '#fff' }).setOrigin(0.5));
+    c.add(this.add.text(0, -88, won ? '¡HAS GANADO!' : 'HAS PERDIDO', { fontFamily: FONT, fontSize: '32px', color: won ? '#ffd23f' : '#ffffff', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
+    c.add(this.add.text(0, -18, `${d.score.a}  -  ${d.score.b}`, { fontFamily: FONT, fontSize: '28px', color: '#fff' }).setOrigin(0.5));
     const mk = (x: number, label: string, cb: () => void, col: string) => {
-      const b = this.add.text(x, 80, label, { fontFamily: FONT, fontSize: '30px', color: '#fff', backgroundColor: col, padding: { x: 22, y: 10 } }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      const b = this.add.text(x, 80, label, { fontFamily: FONT, fontSize: '20px', color: '#fff', backgroundColor: col, padding: { x: 22, y: 10 } }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       b.on('pointerdown', () => { sfx.ui(); cb(); });
       c.add(b);
     };
     mk(-115, 'REVANCHA', () => { const m = this.scene.get('Match') as any; m.scene.restart(m.cfg); this.scene.restart(); }, '#ff8a1f');
-    mk(115, 'MENÚ', () => this.backToMenu(), '#3a8fd6');
+    mk(115, 'MENU', () => this.backToMenu(), '#3a8fd6');
     this.overPanel = c;
     this.tweens.add({ targets: c, scale: 1, alpha: 1, duration: 400, ease: 'Back.Out' });
     if (won) this.time.addEvent({ delay: 400, repeat: 4, callback: () => this.confetti.explode(60, Phaser.Math.Between(100, w - 100), 80) });
@@ -264,6 +288,7 @@ export class HudScene extends Phaser.Scene {
       if (this.stick.pid < 0 && (kx || ky || !this.touch)) { playerInput.mx = kx; playerInput.my = ky; }
     }
     this.drawMeters();
+    for (const f of this.faces) if (f.until && this.time.now > f.until) { f.until = 0; f.img.setFrame(f.base); }
     const sp = this.btns[2];
     if (sp) {
       const ready = this.meterVals.a >= 1 && !this.meterVals.pa;

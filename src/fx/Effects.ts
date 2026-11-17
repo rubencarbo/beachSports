@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { Theme } from '../entities/Ball';
+import { PIXEL_FONT } from '../core/fonts';
 
 const THEME_TINTS: Record<Theme, number[]> = {
   sun: [0xffe680, 0xffa020, 0xff6a00, 0xe03000],
@@ -88,8 +89,8 @@ export class Effects {
 
   floatText(x: number, y: number, text: string, color = '#ffffff', size = 34) {
     const t = this.scene.add.text(x, y, text, {
-      fontFamily: 'Lilita One, Arial Black, sans-serif', fontSize: `${size}px`, color,
-      stroke: '#2a1a12', strokeThickness: 7,
+      fontFamily: PIXEL_FONT, fontSize: `${Math.round(size * 0.6)}px`, color,
+      stroke: '#1a1020', strokeThickness: 6,
     }).setOrigin(0.5).setDepth(700).setScale(0.3);
     this.scene.tweens.add({ targets: t, scale: 1, duration: 220, ease: 'Back.Out' });
     this.scene.tweens.add({ targets: t, y: y - 60, alpha: 0, delay: 650, duration: 450, onComplete: () => t.destroy() });

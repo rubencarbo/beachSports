@@ -61,7 +61,17 @@ src/
 - **iPhone:** pantalla horizontal con `Scale.EXPAND` para llenar el formato 19,5:9, aviso "gira el móvil", gestos del navegador bloqueados, manifest PWA en pantalla completa ("Añadir a pantalla de inicio") y audio desbloqueado al primer toque.
 - **Backend:** Firebase Hosting, Auth anónima y Firestore (`players/{uid}` con estadísticas y `matches` con historial). Reglas en `firestore.rules`.
 
-## 8. Siguientes pasos
+## 8. Estética retro 16 bits
+- **Sprites pixel art generados por código** (`src/core/pixelArt.ts` y `characters.ts`). Se dibujan formas sobre una rejilla de materiales y después se aplica sombreado por bandas (luz, base y sombra), contorno selectivo de 1 px y detalles píxel a píxel. Los miembros del fondo van más oscuros.
+  - Deportistas de 48×64 px con 24 frames: espera, carrera (6), derecha (4), remate en salto (4), saque (3), salto, celebración (2), lamento, aturdido y poder.
+  - Público de 18 variantes de 22×36 px con poses de reposo, brazos arriba, salto y cartel. También siluetas de espaldas (6 variantes, con brazos arriba), perro y gaviotas.
+- **Recursos del usuario:**
+  - El fondo tropical se reduce a su resolución nativa (250×89, unos 8 px por píxel de arte) y se escala sin filtrado, con copias en espejo a los lados.
+  - Las 6 expresiones de la hoja de personaje se recortan quitando el croma verde. Se usan como retratos animados en el marcador, junto con una versión recoloreada para el jugador naranja.
+- **Shader retro** (`src/fx/RetroPipeline.ts`): rejilla de unos 250 píxeles de alto con muestreo nearest y color de 15 bits (5 bits por canal, como la SNES). Todo comparte la misma rejilla.
+- Fuente pixel *Press Start 2P* en la interfaz. No tiene mayúsculas con tilde.
+
+## 9. Siguientes pasos
 1. Multijugador online 1 vs 1 con Firebase Realtime Database (más baja latencia que Firestore). Modelo autoritativo del que saca, enviando solo los eventos de golpe (posición + velocidad), ya que la trayectoria es determinista.
 2. Vóley playa: `touchesPerSide: 3` y controles de recepción, colocación y remate. Futvóley: mismos toques usando el cuerpo. El escenario, la cámara, los efectos y el público se reutilizan tal cual.
 3. Arte final en sprite sheets, música, ranking global y personajes desbloqueables.

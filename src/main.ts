@@ -5,18 +5,21 @@ import { HudScene } from './scenes/HudScene';
 import { MatchScene } from './scenes/MatchScene';
 import { MenuScene } from './scenes/MenuScene';
 import { initBackend } from './services/backend';
+import { RetroPipeline } from './fx/RetroPipeline';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  backgroundColor: '#8cc8f0',
+  backgroundColor: '#5c8ad1',
   scale: {
     mode: Phaser.Scale.EXPAND, // rellena pantallas panorámicas (iPhone ~19.5:9) sin bandas negras
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: VIEW_W,
     height: VIEW_H,
   },
-  render: { antialias: true, powerPreference: 'high-performance' },
+  pixelArt: true,
+  render: { antialias: false, pixelArt: true, roundPixels: false, powerPreference: 'high-performance' },
+  pipeline: { RetroPipeline } as any,
   fps: { target: 60 },
   input: { activePointers: 4 },
   scene: [BootScene, MatchScene, MenuScene, HudScene],
