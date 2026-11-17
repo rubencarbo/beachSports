@@ -1,0 +1,15 @@
+{
+  "_comment": "Hoja chibi de la jugadora turquesa (misma disposición que sun_chibi).",
+  "pieces": {
+    "full": [235, 364],
+    "head": [580, 155], "head_angry": [790, 155], "head_happy": [996, 155], "head_sad": [1214, 155],
+    "torso": [603, 402],
+    "arm": [766, 413],
+    "leg": [1125, 413],
+    "paddle": [600, 646]
+  },
+  "split": {
+    "arm": { "at": 0.5, "overlap": 0.06, "into": ["upperarm", "forearm"] },
+    "leg": { "at": 0.5, "overlap": 0.06, "into": ["thigh", "lowerleg"] }
+  }
+}
