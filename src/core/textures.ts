@@ -314,14 +314,14 @@ export function generateTextures(scene: Phaser.Scene) {
   });
   // arena de la pista con granulado
   canvasTex(scene, 'sand', 512, 512, (c, w, h) => {
-    c.fillStyle = '#efd7a4';
+    c.fillStyle = '#f9d27a'; // color de la arena del fondo pixel art
     c.fillRect(0, 0, w, h);
     for (let i = 0; i < 4000; i++) {
-      c.fillStyle = pick(['rgba(200,160,100,.35)', 'rgba(255,240,210,.5)', 'rgba(180,140,90,.25)']);
+      c.fillStyle = pick(['rgba(214,160,70,.35)', 'rgba(255,240,190,.55)', 'rgba(196,140,60,.25)']);
       c.fillRect(rnd(0, w), rnd(0, h), rnd(1, 3), rnd(1, 2));
     }
     for (let i = 0; i < 40; i++) {
-      c.strokeStyle = 'rgba(190,150,95,.25)';
+      c.strokeStyle = 'rgba(200,140,60,.22)';
       c.lineWidth = 2;
       c.beginPath();
       const x = rnd(0, w), y = rnd(0, h);

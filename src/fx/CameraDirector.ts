@@ -26,7 +26,7 @@ export interface Shot {
   priority: number;
 }
 
-export const CAM_BASE_Y = 438;
+export const CAM_BASE_Y = 462;
 
 function smoothDamp(cur: number, target: number, vel: { v: number }, smoothTime: number, dt: number, maxSpeed = Infinity) {
   smoothTime = Math.max(0.0001, smoothTime);

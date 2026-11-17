@@ -11,13 +11,13 @@ export const PPM = 58; // píxeles por metro a z=0
 /** Píxeles de mundo por cada píxel de arte de los sprites (a z=0). */
 export const ART_SCALE = 2.6;
 /** Escala (px de mundo por px de arte) de los personajes por piezas. */
-export const RIG_SCALE = 1.05;
+export const RIG_SCALE = 1.38;
 /** Tamaño del píxel retro en pantalla (px de canvas) para el shader. */
 export const RETRO_ROWS = 2000; // 1 => sin pixelado extra: el arte ya trae su píxel
 export const GROUND_NEAR_Y = 640; // y en pantalla de la línea cercana (z=0)
-export const DEPTH_PX_PER_M = 22; // cuánto "sube" el suelo por metro de profundidad
+export const DEPTH_PX_PER_M = 18.5; // cuánto "sube" el suelo por metro de profundidad
 export const PERSPECTIVE = 0.03; // reducción de escala por metro de profundidad
-export const HORIZON_Y = 262;
+export const HORIZON_Y = 364;
 
 export const COURT = {
   halfLen: 8, // pista 16 x 8 (beach tennis / palas)
@@ -29,8 +29,8 @@ export const COURT = {
 
 export const PHYS = {
   gravity: 11.5,
-  playerSpeed: 6.4,
-  jumpV: 5.6,
+  playerSpeed: 7.4,
+  jumpV: 6.2,
   reach: 1.35,
   reachUp: 2.45,
 };

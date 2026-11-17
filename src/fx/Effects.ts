@@ -87,6 +87,22 @@ export class Effects {
     this.scene.tweens.add({ targets: glow, scale: 6, alpha: 0, duration: 500, onComplete: () => glow.destroy() });
   }
 
+  /** Estela del golpe (arco blanco muy rápido) para vender el latigazo. */
+  swoosh(x: number, y: number, facing: number, over: boolean, k: number, theme: Theme | null) {
+    const g = this.scene.add.graphics().setDepth(255).setBlendMode('ADD');
+    const r = 52 * k;
+    const [a0, a1] = over ? [-2.6, 0.9] : [2.4, -0.9]; // ángulos (mirando a la derecha)
+    const steps = 10;
+    const col = theme ? THEME_TINTS[theme][1] : 0xffffff;
+    for (let i = 0; i < steps; i++) {
+      const t0 = i / steps, t1 = (i + 1) / steps;
+      const aa = a0 + (a1 - a0) * t0, bb = a0 + (a1 - a0) * t1;
+      g.lineStyle((3 + 9 * t1) * k, col, 0.15 + 0.6 * t1);
+      g.lineBetween(x + facing * Math.cos(aa) * r, y + Math.sin(aa) * r, x + facing * Math.cos(bb) * r, y + Math.sin(bb) * r);
+    }
+    this.scene.tweens.add({ targets: g, alpha: 0, duration: 160, onComplete: () => g.destroy() });
+  }
+
   floatText(x: number, y: number, text: string, color = '#ffffff', size = 34) {
     const t = this.scene.add.text(x, y, text, {
       fontFamily: PIXEL_FONT, fontSize: `${Math.round(size * 0.6)}px`, color,

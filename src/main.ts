@@ -4,6 +4,8 @@ import { BootScene } from './scenes/BootScene';
 import { HudScene } from './scenes/HudScene';
 import { MatchScene } from './scenes/MatchScene';
 import { MenuScene } from './scenes/MenuScene';
+import { SettingsScene } from './scenes/SettingsScene';
+import { LabScene } from './scenes/LabScene';
 import { initBackend } from './services/backend';
 import { RetroPipeline } from './fx/RetroPipeline';
 
@@ -22,7 +24,7 @@ const game = new Phaser.Game({
   pipeline: { RetroPipeline } as any,
   fps: { target: 60 },
   input: { activePointers: 4 },
-  scene: [BootScene, MatchScene, MenuScene, HudScene],
+  scene: [BootScene, MatchScene, MenuScene, HudScene, SettingsScene, LabScene],
 });
 
 initBackend();

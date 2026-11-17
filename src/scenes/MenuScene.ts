@@ -80,6 +80,14 @@ export class MenuScene extends Phaser.Scene {
     play.on('pointerdown', () => this.start());
     c.add(play);
     this.input.keyboard?.once('keydown-ENTER', () => this.start());
+    const gear = this.add.text(w - 16, 16, 'AJUSTES', { fontFamily: FONT, fontSize: '12px', color: '#fff', backgroundColor: '#1d2a3acc', padding: { x: 10, y: 8 } })
+      .setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    gear.on('pointerdown', () => { sfx.unlock(); sfx.ui(); this.scene.launch('Settings', { from: 'menu' }); this.scene.stop(); });
+    c.add(gear);
+    const lab = this.add.text(16, 16, 'LAB', { fontFamily: FONT, fontSize: '12px', color: '#fff', backgroundColor: '#1d2a3acc', padding: { x: 10, y: 8 } })
+      .setOrigin(0, 0).setInteractive({ useHandCursor: true });
+    lab.on('pointerdown', () => { sfx.ui(); this.scene.stop('Match'); this.scene.start('Lab'); });
+    c.add(lab);
 
     if (backendEnabled) {
       const st = this.add.text(w - 16, h - 12, 'Conectando…', { fontFamily: FONT, fontSize: '8px', color: '#fff' }).setOrigin(1, 1);

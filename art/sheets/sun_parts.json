@@ -1,0 +1,12 @@
+{
+  "_comment": "Centro aproximado (en px de la imagen original) de cada pieza de la hoja generada. El importador asigna a cada nombre la pieza más cercana.",
+  "pieces": {
+    "full": [189, 382],
+    "head": [431, 129], "head_angry": [623, 129], "head_happy": [829, 126], "head_sad": [1254, 126],
+    "torso": [433, 373], "pelvis": [1036, 141],
+    "arm": [611, 364], "paddlehand": [829, 408], "openhand": [1042, 390],
+    "thigh": [1248, 385], "lowerleg": [631, 629], "shoe": [829, 700],
+    "hairtuft": [1048, 623], "paddle": [1254, 634]
+  },
+  "split": { "arm": { "at": 0.47, "overlap": 0.05, "into": ["upperarm", "forearm"] } }
+}

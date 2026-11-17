@@ -3,7 +3,10 @@
 Importador de hojas de piezas (personaje recortable) generadas sobre croma verde.
 
 Uso:
-  python3 -I art/tools/ingest_parts.py art/raw/wave_parts.jpg src/assets/rig_wave [--recolor sun src/assets/rig_sun]
+  python3 -I art/tools/ingest_parts.py art/raw/wave_parts.jpg src/assets/rig_wave [--map art/sheets/x.json] [--recolor sun src/assets/rig_sun]
+
+  --map: JSON con el centro aproximado de cada pieza ("pieces") y piezas a partir en dos ("split").
+         Sin --map se asume la rejilla 4x3 del primer prompt.
 
 Pasos:
  1. Detecta el tamaño real del píxel de arte (FFT de los bordes) y su fase.
@@ -107,6 +110,75 @@ def name_parts(comps, w, h):
 
 
 def recolor(rgba, part, scheme):
+    if scheme == 'wave':
+        return recolor_to_wave(rgba, part)
+    return recolor_to_sun(rgba, part)
+
+
+def hair_mask(rgba):
+    """Pelo = zonas 'vivas' (naranja/amarillo saturado) conectadas que tocan la parte alta de la cabeza.
+    Así los píxeles saturados sueltos de la cara (mejillas, sombras) no se confunden con pelo."""
+    h, w = rgba.shape[:2]
+    vivid = np.zeros((h, w), bool)
+    for y in range(h):
+        for x in range(w):
+            if rgba[y, x, 3] == 0:
+                continue
+            hh, ll, ss = colorsys.rgb_to_hls(*(rgba[y, x, :3] / 255.0))
+            hue = hh * 360
+            vivid[y, x] = ss >= 0.78 and (hue < 70 or hue > 345) and ll > 0.08
+    seen = np.zeros_like(vivid); keep = np.zeros_like(vivid)
+    for y in range(h):
+        for x in range(w):
+            if vivid[y, x] and not seen[y, x]:
+                st = [(y, x)]; seen[y, x] = True; pts = []
+                while st:
+                    cy, cx = st.pop(); pts.append((cy, cx))
+                    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        ny, nx = cy + dy, cx + dx
+                        if 0 <= ny < h and 0 <= nx < w and vivid[ny, nx] and not seen[ny, nx]:
+                            seen[ny, nx] = True; st.append((ny, nx))
+                mx = sum(p_[1] for p_ in pts) / len(pts)
+                if (len(pts) > 12 and min(p_[0] for p_ in pts) < h * 0.4) or (len(pts) > 3 and mx < w * 0.45):
+                    for p_ in pts:
+                        keep[p_] = True
+    return keep
+
+
+def recolor_to_wave(rgba, part):
+    """Naranja -> turquesa (provisional hasta tener la hoja propia de la jugadora turquesa):
+    pelo naranja -> castaño oscuro, ropa y pala naranja -> turquesa, ribetes amarillos -> blancos."""
+    out = rgba.copy()
+    h, w = out.shape[:2]
+    is_head = part.startswith('head') or part in ('hairtuft',)
+    hm = hair_mask(rgba) if is_head else None
+    for y in range(h):
+        for x in range(w):
+            if out[y, x, 3] == 0:
+                continue
+            R, G, B = out[y, x, :3] / 255.0
+            hh, ll, ss = colorsys.rgb_to_hls(R, G, B)
+            hue = hh * 360
+            new = None
+            # la piel tiene saturación < 0,8; pelo, visera, camiseta y pala naranjas son >= 0,8
+            vivid = ss >= 0.8 and ll > 0.08
+            if is_head:
+                if hm[y, x]:
+                    new = (24 / 360, 0.08 + ll * 0.36, 0.5)  # pelo castaño oscuro
+            elif vivid and (hue < 40 or hue > 345):
+                if is_head:
+                    new = (24 / 360, 0.08 + ll * 0.36, 0.5)  # pelo castaño oscuro
+                else:
+                    new = (182 / 360, ll * 0.95, 0.75)  # turquesa
+            elif vivid and 40 <= hue < 70:
+                new = (28 / 360, 0.2 + ll * 0.3, 0.45) if is_head else (0, min(0.95, ll * 1.25), 0.0)
+            if new:
+                rr, gg, bb = colorsys.hls_to_rgb(new[0], min(0.9, new[1]), new[2])
+                out[y, x, :3] = [rr * 255, gg * 255, bb * 255]
+    return out
+
+
+def recolor_to_sun(rgba, part):
     """Variante 'sun': camiseta -> naranja, pelo -> dorado, cinta -> roja, pala -> roja."""
     out = rgba.copy()
     h, w = out.shape[:2]
@@ -135,16 +207,26 @@ def recolor(rgba, part, scheme):
 def main():
     src, outbase = sys.argv[1], sys.argv[2]
     variants = []
-    if '--recolor' in sys.argv:
-        i = sys.argv.index('--recolor')
-        variants.append((sys.argv[i + 1], sys.argv[i + 2]))
+    for i, arg in enumerate(sys.argv):
+        if arg == '--recolor':
+            variants.append((sys.argv[i + 1], sys.argv[i + 2]))
     a = np.asarray(Image.open(src).convert('RGB'), np.float32)
     n, p = to_native(a)
     mask = chroma_mask(n)
     n = despill(n, mask)
     lab, comps = components(mask)
     h, w = mask.shape
-    parts = name_parts(comps, w, h)
+    cfg = None
+    if '--map' in sys.argv:
+        cfg = json.load(open(sys.argv[sys.argv.index('--map') + 1]))
+        big = [c for c in comps if c['n'] > 25]
+        parts = {}
+        for name, (cx, cy) in cfg['pieces'].items():
+            nx, ny = cx / p, cy / p
+            best = min(big, key=lambda c: ((c['x0'] + c['x1']) / 2 - nx) ** 2 + ((c['y0'] + c['y1']) / 2 - ny) ** 2)
+            parts[name] = best
+    else:
+        parts = name_parts(comps, w, h)
     print(f'pixel={p:.2f}px native={w}x{h} parts={sorted(parts)}')
 
     crops = {}
@@ -154,6 +236,16 @@ def main():
         rgba[..., :3] = np.clip(n[c['y0']:c['y1'] + 1, c['x0']:c['x1'] + 1], 0, 255)
         rgba[..., 3] = sub * 255
         crops[name] = rgba
+    # piezas que hay que partir (p. ej. brazo entero -> brazo + antebrazo), con solape en la articulación
+    for name, sp in ((cfg or {}).get('split') or {}).items():
+        if name not in crops:
+            continue
+        v = crops.pop(name)
+        hh = v.shape[0]
+        cut = int(hh * sp['at']); ov = max(1, int(hh * sp.get('overlap', 0.04)))
+        a_, b_ = sp['into']
+        crops[a_] = v[:cut + ov].copy()
+        crops[b_] = v[cut - ov:].copy()
 
     def pack(cr, path):
         pad = 2

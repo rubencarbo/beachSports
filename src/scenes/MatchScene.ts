@@ -135,7 +135,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ cámara
-  private baseZoom() { return (this.cameras.main.width / VIEW_W) * 1.2; }
+  private baseZoom() { return (this.cameras.main.width / VIEW_W) * 1.32; }
 
   private updateCameraTargets() {
     const d = this.dir;
@@ -216,7 +216,15 @@ export class MatchScene extends Phaser.Scene {
         p.update(dt, { ...it, mx: 0, jump: false, mz: serving ? it.mz : 0 }, serving);
       } else p.update(dt, it, this.state !== 'over');
       if (!wasAir && p.airborne) sfx.jump();
-      if (wasAir && !p.airborne) { sfx.land(); const g = project(p.x, 0, p.z); this.fx.sandPuff(g.x, g.y, 8); }
+      if (wasAir && !p.airborne) { sfx.land(); const g = project(p.x, 0, p.z); this.fx.sandPuff(g.x, g.y, 10); }
+      for (const e of p.events) if (e === 'skid') { const g = project(p.x + p.vx * 0.05, 0, p.z); this.fx.sandPuff(g.x, g.y, 6); }
+      p.events.length = 0;
+      // anticipación: la pala se prepara sola cuando la bola viene hacia este jugador
+      const b = this.ball;
+      if (b.live && !b.held && b.lastHitter !== p.side && Math.abs(b.vx) > 0.5) {
+        const tReach = Math.abs((p.x - b.x) / b.vx);
+        p.prep = Phaser.Math.Clamp(1 - (tReach - 0.15) / 0.45, 0, 1);
+      } else p.prep = Math.max(0, p.prep - realDt * 4);
       if (it.special) this.activateSpecial(p);
       if (it.hit) {
         if (serving && this.ball.held && this.serveTimer < 0) this.startServe(p);
@@ -296,6 +304,8 @@ export class MatchScene extends Phaser.Scene {
     this.state = 'rally';
     this.serveTimer = -1;
     this.rallyHits = 1;
+    p.contact('serve', true);
+    { const sp = project(p.x, 2, p.z); this.fx.swoosh(sp.x, sp.y, p.facing, true, sp.k, null); }
     sfx.hit(0.6);
     const bp = this.ball.screenPos();
     this.fx.hitSpark(bp.x, bp.y);
@@ -339,7 +349,7 @@ export class MatchScene extends Phaser.Scene {
     // bola especial: sólo se devuelve con un golpe perfecto
     if (b.kind === 'special' && q < 0.86) {
       p.stunned = 0.9;
-      p.startSwing('fore');
+      p.contact('fore');
       const bp = b.screenPos();
       this.fx.hitSpark(bp.x, bp.y, true);
       this.dir.shake(180, 0.006);
@@ -365,8 +375,9 @@ export class MatchScene extends Phaser.Scene {
     const v = computeShot({ x: b.x, y: b.y, z: b.z }, p.side, kind, aimZ, special ? 1 : q);
     b.launch(v.vx, v.vy, v.vz, p.side, kind, p.theme);
     this.rallyHits++;
-    p.startSwing(kind === 'smash' || (special && p.airborne) ? 'over' : 'fore');
-    p.swingT = 0.4;
+    const over = kind === 'smash' || (special && p.airborne);
+    p.contact(over ? 'over' : 'fore', kind === 'smash' || special);
+    { const sp = project(p.x, p.y + 1.1, p.z); this.fx.swoosh(sp.x, sp.y, p.facing, over, sp.k, special ? p.theme : null); }
 
     const bp = b.screenPos();
     const perfect = q > 0.85;

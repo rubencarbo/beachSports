@@ -43,25 +43,39 @@ export class BeachStage {
     // --- cielo de fondo (color de la fila superior del fondo pixel art)
     const sky = this.layer(0, 0, 0);
     sky.add(s.add.rectangle(STAGE_CX, CAM_BASE_Y, 6000, 3000, 0x6d96cd));
-    // --- fondo tropical pixel art (imagen del usuario a resolución nativa, escalada sin filtrado)
-    const bd = this.layer(0.3, 0.42, 2);
-    const BDS = 7.2; // escala: 1 píxel de arte = 7,2 px de mundo
-    const bdTop = HORIZON_Y - 47.5 * BDS;
-    const bdW = 250 * BDS;
-    for (const k of [-1, 0, 1]) {
-      // copias en espejo a los lados: el paneo nunca deja ver el borde
-      const im = s.add.image(STAGE_CX + k * bdW, bdTop, 'backdrop').setOrigin(0.5, 0).setScale(BDS).setFlipX(k !== 0);
-      bd.add(im);
+    // --- fondo pixel art (imagen del usuario a resolución nativa 377x160), en 3 bandas con paralaje:
+    //     cielo (con el sol) / mar con islas (algo comprimido en vertical) / playa con sombrillas
+    const tex = s.textures.get('plate');
+    tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    if (!tex.has('sky')) {
+      tex.add('sky', 0, 0, 0, 377, 72);
+      tex.add('sea', 0, 0, 66, 377, 52);
+      tex.add('beach', 0, 0, 112, 377, 48);
     }
-    const sunX = STAGE_CX - bdW / 2 + 58 * BDS, sunY = bdTop + 18 * BDS;
-    this.rays = s.add.image(sunX, sunY, 'rays').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.35).setScale(1.5);
-    bd.add(this.rays);
-    for (let i = 0; i < 46; i++) {
+    const S = 4.2; // px de mundo por px del fondo
+    const PW = 377 * S;
+    const plateBand = (layer: Phaser.GameObjects.Container, frame: string, top: number, sy = S) => {
+      for (const k of [-1, 0, 1]) {
+        layer.add(s.add.image(STAGE_CX + k * PW, top, 'plate', frame).setOrigin(0.5, 0).setScale(S, sy).setFlipX(k !== 0));
+      }
+    };
+    const skyL = this.layer(0.12, 0.25, 1);
+    plateBand(skyL, 'sky', HORIZON_Y - 55 - 72 * S + 40);
+    const seaL = this.layer(0.3, 0.45, 2);
+    const SEA_SY = 2.0;
+    plateBand(seaL, 'sea', HORIZON_Y - 15 * SEA_SY, SEA_SY); // fila 81 del fondo = horizonte
+    const beachL = this.layer(0.5, 0.65, 4);
+    plateBand(beachL, 'beach', HORIZON_Y + 36 * SEA_SY - 7 * S);
+    const sunX = STAGE_CX - PW / 2 + 117 * S;
+    this.rays = s.add.image(sunX, HORIZON_Y - 55 - 72 * S + 40 + 31 * S, 'rays').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.3).setScale(1.4);
+    skyL.add(this.rays);
+    const bd = seaL;
+    for (let i = 0; i < 40; i++) {
       // destellos del sol sobre el agua
-      const near = Math.random() < 0.65;
-      const x = near ? sunX + (Math.random() - 0.3) * 520 : STAGE_CX + (Math.random() - 0.5) * 1700;
-      const y = HORIZON_Y + 4 + Math.random() * 13 * BDS;
-      const sp = s.add.image(x, y, 'square').setScale(Math.random() < 0.3 ? 1.6 : 1).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+      const near = Math.random() < 0.7;
+      const x = near ? sunX + (Math.random() - 0.5) * 260 : STAGE_CX + (Math.random() - 0.5) * 1500;
+      const y = HORIZON_Y + 4 + Math.random() * 60;
+      const sp = s.add.image(x, y, 'square').setScale(Math.random() < 0.3 ? 1.4 : 0.9).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
       this.sparkles.push(sp);
       bd.add(sp);
     }

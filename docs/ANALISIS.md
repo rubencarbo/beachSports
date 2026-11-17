@@ -71,7 +71,17 @@ src/
 - **Shader retro** (`src/fx/RetroPipeline.ts`): rejilla de unos 250 píxeles de alto con muestreo nearest y color de 15 bits (5 bits por canal, como la SNES). Todo comparte la misma rejilla.
 - Fuente pixel *Press Start 2P* en la interfaz. No tiene mayúsculas con tilde.
 
-## 9. Siguientes pasos
+## 9. Arte generado + esqueleto (fase actual)
+- **Flujo de arte:** prompts detallados para generar el arte por IA. `art/tools/ingest_parts.py` lo deja listo para el juego: detecta el tamaño de píxel, lo reduce a resolución nativa, quita el croma verde, separa las piezas (por rejilla o con un mapa de posiciones en `art/sheets/*.json`), puede partir piezas (por ejemplo, el brazo por el codo), calcula las articulaciones, empaqueta el atlas y crea variantes recoloreadas. `art/tools/ingest_plate.py` hace lo mismo con los fondos.
+- **Personajes por piezas** (`src/entities/Rig.ts`): poses chibi interpoladas en continuo.
+  - Golpes en 4 fases: preparación de 0,10–0,30 s, latigazo de 0,06 s sincronizado con el contacto real, gesto final de 0,16 s y recuperación de 0,14 s.
+  - Salto con agachado previo, estiramiento y aplastamiento, mechón de pelo con muelle, rebote de la pala y anticipación cuando se acerca la bola.
+- **Movimiento** (`Player.ts`): aceleración de 95 m/s² y frenada de 80 m/s² (respuesta casi instantánea), velocidad de 7,4 m/s, derrape con polvo de arena y cadencia de carrera ligada a la zancada.
+- **Encuadre medido en el vídeo:** horizonte al 30 % de la pantalla, pista menos profunda (18,5 px/m) y jugadoras al 22–26 % de la altura de pantalla.
+- **Ajustes de controles** (`SettingsScene`, `core/settings.ts`): tamaño de la cruceta y de los botones, transparencia, cruceta flotante o fija, modo zurdo y colocación arrastrando. Se guardan en el dispositivo.
+- **Laboratorio de animación** (`LabScene`, botón LAB del menú o `#lab`): animaciones en bucle, cámara lenta, pausa y avance por fotograma, parámetros en vivo y fotogramas del vídeo de referencia para comparar.
+
+## 10. Siguientes pasos
 1. Multijugador online 1 vs 1 con Firebase Realtime Database (más baja latencia que Firestore). Modelo autoritativo del que saca, enviando solo los eventos de golpe (posición + velocidad), ya que la trayectoria es determinista.
 2. Vóley playa: `touchesPerSide: 3` y controles de recepción, colocación y remate. Futvóley: mismos toques usando el cuerpo. El escenario, la cámara, los efectos y el público se reutilizan tal cual.
 3. Arte final en sprite sheets, música, ranking global y personajes desbloqueables.

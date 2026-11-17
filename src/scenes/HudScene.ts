@@ -4,6 +4,7 @@ import { playerInput } from '../core/input';
 import { applyRetro } from '../fx/RetroPipeline';
 
 import { PIXEL_FONT as FONT } from '../core/fonts';
+import { CtrlId, ctrlPos, getSettings, onSettings, updateSettings } from '../core/settings';
 
 interface Btn { c: Phaser.GameObjects.Container; r: number; key: 'hit' | 'jump' | 'special'; ring: Phaser.GameObjects.Arc; pid: number }
 
@@ -25,8 +26,20 @@ export class HudScene extends Phaser.Scene {
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private touch = false;
   private faces: { img: Phaser.GameObjects.Image; base: number; until: number }[] = [];
+  private edit = false;
+  private standalone = false;
+  private editUi?: Phaser.GameObjects.Container;
+  private drag: { id: CtrlId; pid: number; dx: number; dy: number } | null = null;
+  private pauseUi?: Phaser.GameObjects.Container;
 
   constructor() { super('Hud'); }
+
+  init(d: { edit?: boolean; standalone?: boolean }) {
+    this.edit = !!d.edit;
+    this.standalone = !!d.standalone;
+    this.btns = []; this.faces = [];
+    this.last = { a: 0, b: 0 };
+  }
 
   create() {
     this.touch = this.sys.game.device.input.touch;
@@ -53,12 +66,21 @@ export class HudScene extends Phaser.Scene {
     const onPoint = (d: any) => this.onPoint(d);
     const onOver = (d: any) => this.onOver(d);
     const onFace = (d: { side: number; expr: number; dur: number }) => this.setFace(d.side, d.expr, d.dur);
+    const onEdit = () => this.setEdit(true);
+    const onSettingsClosed = () => this.showPause();
     ev.on('hud', onHud); ev.on('point', onPoint); ev.on('match-over', onOver); ev.on('face', onFace);
-    this.events.once('shutdown', () => { ev.off('hud', onHud); ev.off('point', onPoint); ev.off('match-over', onOver); ev.off('face', onFace); });
+    ev.on('hud-edit', onEdit); ev.on('hud-settings-closed', onSettingsClosed);
+    const offSettings = onSettings(() => this.layout());
+    this.events.once('shutdown', () => {
+      ev.off('hud', onHud); ev.off('point', onPoint); ev.off('match-over', onOver); ev.off('face', onFace);
+      ev.off('hud-edit', onEdit); ev.off('hud-settings-closed', onSettingsClosed); offSettings();
+    });
     applyRetro(this.cameras.main, 360);
     this.scale.on('resize', this.layout, this);
     this.events.once('shutdown', () => this.scale.off('resize', this.layout, this));
+    if (this.standalone) { this.panel.setVisible(false); (this.children.getByName('menuBtn') as any)?.setVisible(false); }
     this.layout();
+    if (this.edit) this.setEdit(true);
   }
 
   // ------------------------------------------------------------ construcción
@@ -79,13 +101,13 @@ export class HudScene extends Phaser.Scene {
     this.meterA = this.add.graphics();
     this.meterB = this.add.graphics();
     c.add([...this.names, this.scoreA, this.scoreB, dash, this.meterA, this.meterB]);
-    // retratos (caras del usuario: 0 normal, 1 esfuerzo, 2 risa, 3 grito, 4 sorpresa, 5 agotado)
-    for (const [i, key, x] of [[0, 'faces_sun', -214], [1, 'faces_wave', 214]] as [number, string, number][]) {
+    // retratos: las cabezas de las jugadoras (0 normal, 1 esfuerzo, 2 risa, 3 grito, 4 sorpresa, 5 agotada)
+    for (const [i, key, x] of [[0, 'rig_sun', -214], [1, 'rig_wave', 214]] as [number, string, number][]) {
       const frame = this.add.graphics();
       frame.fillStyle(0x1d2a3a, 1).fillRect(x - 34, 2, 68, 74);
       frame.fillStyle(i === 0 ? 0xff8a1f : 0x25c4c4, 1).fillRect(x - 31, 5, 62, 68);
       frame.fillStyle(0x7fc4ec, 1).fillRect(x - 28, 8, 56, 62);
-      const img = this.add.image(x, 72, key, 0).setOrigin(0.5, 1).setScale(1.35).setFlipX(i === 0);
+      const img = this.add.image(x, 72, key, 'head').setOrigin(0.5, 1).setScale(1.85).setFlipX(i === 1);
       const mask = this.add.graphics().setVisible(false);
       c.add([frame, img]);
       this.faces.push({ img, base: 0, until: 0 });
@@ -95,7 +117,7 @@ export class HudScene extends Phaser.Scene {
 
     const menu = this.add.text(0, 0, 'II', { fontFamily: FONT, fontSize: '16px', color: '#fff', backgroundColor: '#1d2a3acc', padding: { x: 12, y: 6 } })
       .setDepth(30).setInteractive({ useHandCursor: true }).setName('menuBtn');
-    menu.on('pointerdown', () => { sfx.ui(); this.backToMenu(); });
+    menu.on('pointerdown', () => { sfx.ui(); this.showPause(); });
   }
 
   private drawMeters() {
@@ -132,8 +154,11 @@ export class HudScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       sfx.unlock();
       const w = this.scale.width;
+      const st = getSettings();
+      if (this.edit) { this.startDrag(p); return; }
+      if (this.pauseUi) return;
       for (const b of this.btns) {
-        if (Phaser.Math.Distance.Between(p.x, p.y, b.c.x, b.c.y) < b.r + 18) {
+        if (Phaser.Math.Distance.Between(p.x, p.y, b.c.x, b.c.y) < b.r * st.btnScale + 18) {
           b.pid = p.id;
           b.c.setScale(0.9);
           if (b.key === 'hit') playerInput.pressHit();
@@ -142,61 +167,150 @@ export class HudScene extends Phaser.Scene {
           return;
         }
       }
-      if (p.x < w * 0.5 && this.stick.pid < 0) {
+      const home = ctrlPos('stick', w, this.scale.height);
+      const onStickSide = st.leftHanded ? p.x > w * 0.5 : p.x < w * 0.5;
+      const nearHome = Phaser.Math.Distance.Between(p.x, p.y, home.x, home.y) < 70 * st.stickScale * 1.7;
+      if (this.stick.pid < 0 && (st.stickMode === 'floating' ? onStickSide : nearHome)) {
         this.stick.pid = p.id;
-        this.stick.ox = p.x; this.stick.oy = p.y;
-        this.stick.base.setPosition(p.x, p.y);
-        this.stick.knob.setPosition(p.x, p.y);
+        if (st.stickMode === 'floating') { this.stick.ox = p.x; this.stick.oy = p.y; }
+        else { this.stick.ox = home.x; this.stick.oy = home.y; }
+        this.stick.base.setPosition(this.stick.ox, this.stick.oy);
+        this.stick.knob.setPosition(this.stick.ox, this.stick.oy);
+        this.moveStick(p);
       }
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (this.edit) { this.moveDrag(p); return; }
       if (p.id !== this.stick.pid) return;
-      const dx = p.x - this.stick.ox, dy = p.y - this.stick.oy;
-      const len = Math.hypot(dx, dy), max = 62;
-      const k = len > max ? max / len : 1;
-      this.stick.knob.setPosition(this.stick.ox + dx * k, this.stick.oy + dy * k);
-      const dead = 10;
-      playerInput.mx = len < dead ? 0 : (dx * k) / max;
-      playerInput.my = len < dead ? 0 : -(dy * k) / max;
+      this.moveStick(p);
     });
     const up = (p: Phaser.Input.Pointer) => {
+      if (this.drag && this.drag.pid === p.id) this.endDrag();
       if (p.id === this.stick.pid) {
         this.stick.pid = -1;
         playerInput.mx = playerInput.my = 0;
         this.layoutStick();
       }
-      for (const b of this.btns) if (b.pid === p.id) { b.pid = -1; b.c.setScale(1); if (b.key === 'hit') playerInput.releaseHit(); }
+      for (const b of this.btns) if (b.pid === p.id) { b.pid = -1; b.c.setScale(getSettings().btnScale); if (b.key === 'hit') playerInput.releaseHit(); }
     };
     this.input.on('pointerup', up);
     this.input.on('pointerupoutside', up);
   }
 
+  private moveStick(p: Phaser.Input.Pointer) {
+    {
+      const sc = getSettings().stickScale;
+      const dx = p.x - this.stick.ox, dy = p.y - this.stick.oy;
+      const len = Math.hypot(dx, dy), max = 62 * sc;
+      const k = len > max ? max / len : 1;
+      this.stick.knob.setPosition(this.stick.ox + dx * k, this.stick.oy + dy * k);
+      const dead = 8 * sc;
+      playerInput.mx = len < dead ? 0 : (dx * k) / max;
+      playerInput.my = len < dead ? 0 : -(dy * k) / max;
+    }
+  }
+
+  // ------------------------------------------------------------ modo "colocar controles"
+  private ctrlObjects(): { id: CtrlId; x: number; y: number; r: number }[] {
+    const st = getSettings();
+    return [
+      { id: 'stick', x: this.stick.base.x, y: this.stick.base.y, r: 70 * st.stickScale },
+      ...this.btns.map((b) => ({ id: b.key as CtrlId, x: b.c.x, y: b.c.y, r: b.r * st.btnScale })),
+    ];
+  }
+
+  private startDrag(p: Phaser.Input.Pointer) {
+    const hit = this.ctrlObjects().find((c) => Phaser.Math.Distance.Between(p.x, p.y, c.x, c.y) < c.r + 16);
+    if (hit) this.drag = { id: hit.id, pid: p.id, dx: hit.x - p.x, dy: hit.y - p.y };
+  }
+
+  private moveDrag(p: Phaser.Input.Pointer) {
+    if (!this.drag || this.drag.pid !== p.id) return;
+    const w = this.scale.width, h = this.scale.height;
+    const st = getSettings();
+    let fx = Phaser.Math.Clamp((p.x + this.drag.dx) / w, 0.04, 0.96);
+    const fy = Phaser.Math.Clamp((p.y + this.drag.dy) / h, 0.08, 0.95);
+    if (st.leftHanded) fx = 1 - fx;
+    updateSettings({ pos: { ...st.pos, [this.drag.id]: { x: fx, y: fy } } });
+  }
+
+  private endDrag() { this.drag = null; }
+
+  private setEdit(on: boolean) {
+    this.edit = on;
+    this.pauseUi?.destroy(); this.pauseUi = undefined;
+    this.editUi?.destroy(); this.editUi = undefined;
+    if (on) {
+      const w = this.scale.width;
+      const c = this.add.container(0, 0).setDepth(80);
+      const t = this.add.text(w / 2, 110, 'ARRASTRA LOS CONTROLES', { fontFamily: FONT, fontSize: '16px', color: '#ffd23f', stroke: '#1d2a3a', strokeThickness: 5 }).setOrigin(0.5);
+      const done = this.add.text(w / 2, 160, 'LISTO', { fontFamily: FONT, fontSize: '16px', color: '#fff', backgroundColor: '#e0322a', padding: { x: 18, y: 10 } })
+        .setOrigin(0.5).setInteractive({ useHandCursor: true });
+      done.on('pointerdown', (p: Phaser.Input.Pointer, _x: number, _y: number, e: Phaser.Types.Input.EventData) => {
+        e.stopPropagation(); sfx.ui();
+        this.setEdit(false);
+        if (this.standalone) { this.scene.launch('Settings', { from: 'menu' }); this.scene.stop(); }
+        else this.scene.launch('Settings', { from: 'hud' });
+      });
+      c.add([t, done]);
+      this.editUi = c;
+    }
+    this.layout();
+  }
+
+  // ------------------------------------------------------------ pausa
+  private showPause() {
+    if (this.standalone) return;
+    this.pauseUi?.destroy();
+    if (this.scene.isActive('Match')) this.scene.pause('Match');
+    const w = this.scale.width, h = this.scale.height;
+    const c = this.add.container(0, 0).setDepth(90);
+    const bg = this.add.rectangle(0, 0, w, h, 0x0b1a2a, 0.65).setOrigin(0).setInteractive();
+    c.add(bg);
+    c.add(this.add.text(w / 2, h * 0.25, 'PAUSA', { fontFamily: FONT, fontSize: '32px', color: '#ffd23f', stroke: '#1d2a3a', strokeThickness: 6 }).setOrigin(0.5));
+    const items: [string, string, () => void][] = [
+      ['CONTINUAR', '#25a8a8', () => { this.pauseUi?.destroy(); this.pauseUi = undefined; this.scene.resume('Match'); }],
+      ['AJUSTES', '#ff8a1f', () => { this.pauseUi?.destroy(); this.pauseUi = undefined; this.scene.launch('Settings', { from: 'hud' }); this.scene.bringToTop('Settings'); }],
+      ['MENU', '#3a8fd6', () => { this.scene.resume('Match'); this.backToMenu(); }],
+    ];
+    items.forEach(([t, col, cb], i) => {
+      const b = this.add.text(w / 2, h * 0.42 + i * 62, t, { fontFamily: FONT, fontSize: '18px', color: '#fff', backgroundColor: col, padding: { x: 20, y: 12 } })
+        .setOrigin(0.5).setInteractive({ useHandCursor: true });
+      b.on('pointerdown', () => { sfx.ui(); cb(); });
+      c.add(b);
+    });
+    this.pauseUi = c;
+  }
+
   private layoutStick() {
-    const h = this.scale.height;
-    this.stick.base.setPosition(140, h - 130);
-    this.stick.knob.setPosition(140, h - 130);
+    const p = ctrlPos('stick', this.scale.width, this.scale.height);
+    const sc = getSettings().stickScale;
+    this.stick.base.setPosition(p.x, p.y).setScale(sc);
+    this.stick.knob.setPosition(p.x, p.y).setScale(sc);
   }
 
   private layout() {
     const w = this.scale.width, h = this.scale.height;
     this.panel.setPosition(w / 2, 10);
     (this.children.getByName('menuBtn') as Phaser.GameObjects.Text)?.setPosition(18, 14);
-    this.layoutStick();
-    const [hit, jump, special] = this.btns;
-    hit.c.setPosition(w - 120, h - 118);
-    jump.c.setPosition(w - 262, h - 74);
-    special.c.setPosition(w - 238, h - 210);
+    const st = getSettings();
+    if (this.stick.pid < 0) this.layoutStick();
+    for (const b of this.btns) {
+      const p = ctrlPos(b.key as CtrlId, w, h);
+      b.c.setPosition(p.x, p.y).setScale(st.btnScale);
+    }
     this.hint.setPosition(w / 2, h - 60);
-    const show = this.touch;
-    this.stick.base.setVisible(show); this.stick.knob.setVisible(show);
-    for (const b of this.btns) b.c.setVisible(show);
-    if (!show) this.hint.setText('Mover: WASD/flechas · Golpe: J/Espacio · Salto: K · Especial: L');
+    const show = this.touch || this.edit;
+    const a = this.edit ? Math.max(0.6, st.opacity) : st.opacity;
+    this.stick.base.setVisible(show).setAlpha(a); this.stick.knob.setVisible(show).setAlpha(a);
+    for (const b of this.btns) b.c.setVisible(show).setAlpha(a);
+    if (!this.touch && !this.edit) this.hint.setText('Mover: WASD/flechas · Golpe: J/Espacio · Salto: K · Especial: L');
   }
 
   private setFace(side: number, expr: number, dur: number) {
     const f = this.faces[side === -1 ? 0 : 1];
     if (!f) return;
-    f.img.setFrame(expr);
+    f.img.setFrame(['head', 'head_angry', 'head_happy', 'head_angry', 'head', 'head_sad'][expr] ?? 'head');
     f.until = this.time.now + dur * 1000;
     this.tweens.add({ targets: f.img, y: 66, duration: 70, yoyo: true });
   }
@@ -288,12 +402,13 @@ export class HudScene extends Phaser.Scene {
       if (this.stick.pid < 0 && (kx || ky || !this.touch)) { playerInput.mx = kx; playerInput.my = ky; }
     }
     this.drawMeters();
-    for (const f of this.faces) if (f.until && this.time.now > f.until) { f.until = 0; f.img.setFrame(f.base); }
+    for (const f of this.faces) if (f.until && this.time.now > f.until) { f.until = 0; f.img.setFrame('head'); }
     const sp = this.btns[2];
     if (sp) {
       const ready = this.meterVals.a >= 1 && !this.meterVals.pa;
       sp.ring.setStrokeStyle(5, 0xffd23f, ready ? 0.5 + Math.sin(this.time.now * 0.012) * 0.5 : 0);
-      sp.c.setAlpha(ready || this.meterVals.pa ? 1 : 0.45);
+      const op = this.edit ? 1 : getSettings().opacity;
+      sp.c.setAlpha(op * (ready || this.meterVals.pa || this.edit ? 1 : 0.6));
     }
   }
 }
