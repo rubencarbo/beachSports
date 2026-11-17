@@ -1,6 +1,11 @@
 import Phaser from 'phaser';
-import { ART_SCALE, COURT, PHYS, depthFor, project } from '../config';
-import { ATH_FOOT_Y, ATH_H } from '../core/characters';
+import { COURT, PHYS, RIG_SCALE, depthFor, project } from '../config';
+import { Rig, RigData, RigState } from './Rig';
+import rigSunJson from '../assets/rig_sun.json';
+import rigWaveJson from '../assets/rig_wave.json';
+
+const rigSun = rigSunJson as unknown as RigData;
+const rigWave = rigWaveJson as unknown as RigData;
 import type { Side } from '../sports/types';
 import type { Theme } from './Ball';
 
@@ -31,7 +36,7 @@ export class Player {
   moodT = 0;
   serving = false;
   stunned = 0; // tras recibir un especial sin devolverlo
-  sprite: Phaser.GameObjects.Sprite;
+  rig: Rig;
   shadow: Phaser.GameObjects.Image;
 
   constructor(scene: Phaser.Scene, public side: Side, public theme: Theme, public name: string) {
@@ -39,7 +44,7 @@ export class Player {
     this.z = 4;
     this.facing = -side;
     this.shadow = scene.add.image(0, 0, 'shadow').setDepth(98);
-    this.sprite = scene.add.sprite(0, 0, `ath_${theme}`, 'idle0').setOrigin(0.5, ATH_FOOT_Y / ATH_H);
+    this.rig = new Rig(scene, `rig_${theme}`, theme === 'sun' ? rigSun : rigWave);
   }
 
   get airborne() { return this.y > 0.05; }
@@ -90,33 +95,31 @@ export class Player {
     if (this.moodT > 0) { this.moodT -= dt; if (this.moodT <= 0) this.mood = 'none'; }
   }
 
+  private lastT = 0;
+
   render(time: number) {
     const p = project(this.x, this.y, this.z);
     const g0 = project(this.x, 0, this.z);
-    const s = p.k * ART_SCALE;
+    const s = p.k * RIG_SCALE;
     const hs = Math.max(0.4, 1 - this.y * 0.25);
     this.shadow.setPosition(g0.x, g0.y).setScale(0.9 * p.k * hs, 0.9 * p.k * hs).setAlpha(0.9 * hs);
-    this.sprite.setPosition(p.x, p.y).setScale(s).setDepth(depthFor(this.z)).setFlipX(this.facing < 0);
-    this.sprite.setFrame(this.pickFrame(time));
+    const dt = this.lastT ? Math.min(0.05, (time - this.lastT) / 1000) : 0.016;
+    this.lastT = time;
+    this.rig.update(dt, this.rigState(time));
+    this.rig.container.setPosition(p.x, p.y).setScale(s * this.facing, s).setDepth(depthFor(this.z));
   }
 
-  /** Elige el frame de la hoja de sprites según el estado. */
-  private pickFrame(time: number): string {
-    const t = this.swingT;
-    if (this.stunned > 0) return 'stun0';
-    if (t < 1) {
-      if (this.swingType === 'over') return t < 0.2 ? 'over0' : t < 0.38 ? 'over1' : t < 0.68 ? 'over2' : 'over3';
-      if (this.swingType === 'serve') return t < 0.45 ? 'serve0' : t < 0.75 ? 'serve1' : 'serve2';
-      return t < 0.18 ? 'fore0' : t < 0.36 ? 'fore1' : t < 0.66 ? 'fore2' : 'fore3';
-    }
-    if (this.mood === 'happy') return Math.floor(time / 180) % 2 ? 'cele1' : 'cele0';
-    if (this.mood === 'sad') return 'sad0';
-    if (this.airborne) return 'jump0';
+  /** Estado de animación para el esqueleto. */
+  private rigState(time: number): RigState {
+    if (this.stunned > 0) return { kind: 'stun' };
+    if (this.swingT < 1) return { kind: 'swing', type: this.swingType, t: this.swingT };
+    if (this.mood === 'happy') return { kind: 'happy', time };
+    if (this.mood === 'sad') return { kind: 'sad' };
+    if (this.airborne) return { kind: 'air' };
     const speed = Math.hypot(this.vx, this.vz);
-    if (speed > 0.6) return `run${Math.floor((this.runPhase / (Math.PI * 2)) * 6) % 6}`;
-    if (this.powered) return 'power0';
-    return Math.floor(time / 420) % 2 ? 'idle1' : 'idle0';
+    if (speed > 0.6) return { kind: 'run', phase: this.runPhase, speed };
+    return { kind: 'idle', time, powered: this.powered };
   }
 
-  destroy() { this.sprite.destroy(); this.shadow.destroy(); }
+  destroy() { this.rig.destroy(); this.shadow.destroy(); }
 }

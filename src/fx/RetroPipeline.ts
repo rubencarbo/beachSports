@@ -37,7 +37,7 @@ export function applyRetro(cam: Phaser.Cameras.Scene2D.Camera, rows: number) {
   cam.setPostPipeline(RetroPipeline);
   const pipe = cam.getPostPipeline(RetroPipeline) as RetroPipeline;
   const scale = scene.scale;
-  const update = () => { pipe.block = Math.max(2, Math.round(scale.height / rows)); };
+  const update = () => { pipe.block = Math.max(1, Math.round(scale.height / rows)); };
   update();
   scale.on('resize', update);
   scene.events.once('shutdown', () => scale.off('resize', update));

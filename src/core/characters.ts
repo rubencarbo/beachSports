@@ -10,9 +10,9 @@ export const ATH_W = 48;
 export const ATH_H = 64;
 export const ATH_FOOT_Y = 61;
 
-type Expr = 'normal' | 'effort' | 'happy' | 'sad' | 'shock';
+export type Expr = 'normal' | 'effort' | 'happy' | 'sad' | 'shock';
 
-interface Pose {
+export interface Pose {
   lean: number;
   bob?: number;
   legF: [number, number]; // [muslo, flexión rodilla]
@@ -209,7 +209,7 @@ function drawAthlete(pose: Pose, L: AthleteLook, t: number): PixGrid {
 }
 
 /** Definición de todas las animaciones. */
-function athletePoses(): { name: string; pose: Pose; t: number }[] {
+export function athletePoses(): { name: string; pose: Pose; t: number }[] {
   const out: { name: string; pose: Pose; t: number }[] = [];
   const ready: Pose = { lean: 0.15, legF: [0.4, 0.55], legB: [-0.35, 0.4], armF: [0.55, 1.35], armB: [0.25, 1.1], pad: 0.2 };
   out.push({ name: 'idle0', pose: ready, t: 0 });
@@ -242,7 +242,7 @@ function athletePoses(): { name: string; pose: Pose; t: number }[] {
   out.push({ name: 'jump0', t: 0, pose: { ...air, lean: 0.1, armF: [1.4, 1.0], armB: [1.6, 0.6], pad: 0.2, expr: 'effort' } });
   out.push({ name: 'cele0', t: 0, pose: { lean: -0.05, legF: [0.2, 0.1], legB: [-0.2, 0.1], armF: [2.95, 0.15], armB: [3.4, -0.1], pad: 0, expr: 'happy' } });
   out.push({ name: 'cele1', t: 2, pose: { lean: -0.05, legF: [0.5, 1.0], legB: [-0.1, 1.1], air: true, armF: [3.1, 0.3], armB: [3.25, 0.2], pad: 0, expr: 'happy' } });
-  out.push({ name: 'sad0', t: 0, pose: { lean: 0.35, legF: [0.15, 0.1], legB: [-0.1, 0.1], armF: [0.1, 0.15], armB: [-0.05, 0.1], pad: 0.1, headDy: 2, expr: 'sad' } });
+  out.push({ name: 'sad0', t: 0, pose: { lean: 0.35, legF: [0.15, 0.1], legB: [-0.1, 0.1], armF: [0.1, 0.15], armB: [-0.05, 0.1], pad: 0.1, headDy: 1, expr: 'sad' } });
   out.push({ name: 'stun0', t: 1, pose: { lean: -0.45, legF: [0.7, 0.3], legB: [0.1, 0.6], armF: [-2.2, 0.4], armB: [2.6, 0.5], pad: 0.5, expr: 'shock' } });
   out.push({ name: 'power0', t: 0.5, pose: { lean: 0.05, legF: [0.45, 0.7], legB: [-0.45, 0.65], armF: [2.9, 0.7], armB: [1.4, 0.9], pad: 0.3, expr: 'effort' } });
   return out;
