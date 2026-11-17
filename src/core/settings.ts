@@ -16,10 +16,10 @@ export interface Settings {
 }
 
 export const DEFAULT_POS: Settings['pos'] = {
-  stick: { x: 0.1, y: 0.8 },
-  hit: { x: 0.92, y: 0.82 },
-  jump: { x: 0.83, y: 0.9 },
-  special: { x: 0.845, y: 0.7 },
+  stick: { x: 0.11, y: 0.77 },
+  hit: { x: 0.915, y: 0.79 },
+  jump: { x: 0.8, y: 0.9 },
+  special: { x: 0.83, y: 0.63 },
 };
 
 export const DEFAULT_SETTINGS: Settings = {

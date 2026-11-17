@@ -25,6 +25,7 @@ export class HudScene extends Phaser.Scene {
   private touch = false;
   private faces: { img: Phaser.GameObjects.Image; until: number }[] = [];
   private edit = false;
+  private editMode: 'place' | 'settings' = 'place';
   private standalone = false;
   private editUi?: Phaser.GameObjects.Container;
   private drag: { id: CtrlId; pid: number; dx: number; dy: number } | null = null;
@@ -34,8 +35,9 @@ export class HudScene extends Phaser.Scene {
 
   constructor() { super('Hud'); }
 
-  init(d: { edit?: boolean; standalone?: boolean }) {
+  init(d: { edit?: boolean | 'settings'; standalone?: boolean }) {
     this.edit = !!d.edit;
+    this.editMode = d.edit === 'settings' ? 'settings' : 'place';
     this.standalone = !!d.standalone;
     this.btns = []; this.faces = [];
     this.last = { a: 0, b: 0 };
@@ -54,7 +56,7 @@ export class HudScene extends Phaser.Scene {
       rotate: { start: 0, end: 720 }, scaleX: { start: 1.4, end: 0.5 }, scaleY: { min: 0.6, max: 1.6 },
       tint: [0xff5a5a, 0xffd23f, 0x3ab0ff, 0x7bd389, 0xff9f1c, 0xc77dff, 0xffffff], emitting: false,
     }).setDepth(50);
-    this.hint = label(this, 0, 0, '', 20, '#fff3d6').setDepth(40);
+    this.hint = label(this, 0, 0, '', 28, '#fff3d6').setDepth(40);
 
     const kb = this.input.keyboard!;
     this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,SPACE,SHIFT,ESC,P') as any;
@@ -70,16 +72,17 @@ export class HudScene extends Phaser.Scene {
     const onPoint = (d: any) => this.onPoint(d);
     const onOver = (d: any) => this.onOver(d);
     const onFace = (d: { side: number; expr: number; dur: number }) => this.setFace(d.side, d.expr, d.dur);
-    const onEdit = () => this.setEdit(true);
+    const onEdit = (mode?: 'settings') => { this.editMode = mode === 'settings' ? 'settings' : 'place'; this.setEdit(true); };
+    const onEditEnd = () => { this.setEdit(false); this.showPause(); };
     const onSettingsClosed = () => this.showPause();
     ev.on('hud', onHud); ev.on('point', onPoint); ev.on('match-over', onOver); ev.on('face', onFace);
-    ev.on('hud-edit', onEdit); ev.on('hud-settings-closed', onSettingsClosed);
+    ev.on('hud-edit', onEdit); ev.on('hud-settings-closed', onSettingsClosed); ev.on('hud-edit-end', onEditEnd);
     const offSettings = onSettings(() => this.layout());
     this.events.once('shutdown', () => {
       ev.off('hud', onHud); ev.off('point', onPoint); ev.off('match-over', onOver); ev.off('face', onFace);
-      ev.off('hud-edit', onEdit); ev.off('hud-settings-closed', onSettingsClosed); offSettings();
+      ev.off('hud-edit', onEdit); ev.off('hud-settings-closed', onSettingsClosed); ev.off('hud-edit-end', onEditEnd); offSettings();
     });
-    applyRetro(this.cameras.main, 360);
+    applyRetro(this.cameras.main, 2000);
     this.scale.on('resize', this.layout, this);
     this.events.once('shutdown', () => this.scale.off('resize', this.layout, this));
     if (this.standalone) { this.panelTop.setVisible(false); this.pauseBtn.setVisible(false); }
@@ -100,14 +103,14 @@ export class HudScene extends Phaser.Scene {
     g.fillStyle(shade(UI.cream, 0.85), 1).fillRect(-66, 35, 54, 2).fillRect(12, 35, 54, 2);
     block(g, -46, 62, 92, 28, UI.inkSoft, { shadow: false });
     c.add(g);
-    c.add(label(this, 0, 76, `A ${this.target}`, 14, '#ffd23f'));
+    c.add(label(this, 0, 76, `A ${this.target}`, 18, '#ffd23f'));
     this.scoreTxt = [
       this.add.text(-39, 37, '0', { fontFamily: TITLE_FONT, fontSize: '28px', color: '#e0611a' }).setOrigin(0.5),
       this.add.text(39, 37, '0', { fontFamily: TITLE_FONT, fontSize: '28px', color: '#0e7f8f' }).setOrigin(0.5),
     ];
     this.names = [
-      label(this, -W / 2 + 64 + 95, 31, 'TÚ', 22),
-      label(this, W / 2 - 64 - 95, 31, 'CPU', 22),
+      label(this, -W / 2 + 64 + 95, 31, 'TÚ', 28),
+      label(this, W / 2 - 64 - 95, 31, 'CPU', 28),
     ];
     this.meters = this.add.graphics();
     this.serveIcon = this.add.graphics();
@@ -123,7 +126,7 @@ export class HudScene extends Phaser.Scene {
     }
     this.panelTop = c;
 
-    const pb = button(this, 0, 0, 64, 58, '', () => this.showPause(), { icon: 'pause', color: UI.inkSoft });
+    const pb = button(this, 0, 0, 80, 72, '', () => this.showPause(), { icon: 'pause', color: UI.inkSoft });
     pb.c.setDepth(30);
     this.pauseBtn = pb.c;
   }
@@ -177,7 +180,7 @@ export class HudScene extends Phaser.Scene {
     const c = this.add.container(0, 0).setDepth(30);
     const g = this.add.graphics();
     c.add(g);
-    if (text) c.add(this.add.text(0, r * 0.52, text, { fontFamily: LABEL_FONT, fontStyle: 'bold', fontSize: `${Math.round(r * 0.3)}px`, color: '#fff3d6', stroke: '#1b2240', strokeThickness: 4 }).setOrigin(0.5));
+    if (text) c.add(this.add.text(0, r * 0.52, text, { fontFamily: LABEL_FONT, fontStyle: 'bold', fontSize: `${Math.round(r * 0.34)}px`, color: '#fff3d6', stroke: '#1b2240', strokeThickness: 4 }).setOrigin(0.5));
     const b: Btn = { c, g, r, key, pid: -1, color, icon: ic, text };
     this.drawBtn(b, false);
     this.btns.push(b);
@@ -187,12 +190,12 @@ export class HudScene extends Phaser.Scene {
   private buildControls() {
     const sc = this.add.container(0, 0).setDepth(30);
     const sg = this.add.graphics();
-    sg.fillStyle(0x000000, 0.22).fillCircle(4, 6, 74);
-    sg.fillStyle(UI.ink, 0.85).fillCircle(0, 0, 72);
-    sg.fillStyle(0x2c3560, 0.85).fillCircle(0, 0, 66);
-    sg.lineStyle(3, UI.cream, 0.35).strokeCircle(0, 0, 50);
-    for (const [dx, dy, a] of [[0, -56, 0], [56, 0, Math.PI / 2], [0, 56, Math.PI], [-56, 0, -Math.PI / 2]] as [number, number, number][]) {
-      const s = 9;
+    sg.fillStyle(0x000000, 0.22).fillCircle(4, 6, 86);
+    sg.fillStyle(UI.ink, 0.85).fillCircle(0, 0, 84);
+    sg.fillStyle(0x2c3560, 0.85).fillCircle(0, 0, 77);
+    sg.lineStyle(3, UI.cream, 0.35).strokeCircle(0, 0, 58);
+    for (const [dx, dy, a] of [[0, -66, 0], [66, 0, Math.PI / 2], [0, 66, Math.PI], [-66, 0, -Math.PI / 2]] as [number, number, number][]) {
+      const s = 11;
       sg.fillStyle(UI.cream, 0.8).fillTriangle(
         dx + Math.sin(a) * s, dy - Math.cos(a) * s,
         dx - Math.cos(a) * s - Math.sin(a) * s * 0.4, dy - Math.sin(a) * s + Math.cos(a) * s * 0.4,
@@ -201,17 +204,17 @@ export class HudScene extends Phaser.Scene {
     sc.add(sg);
     const knob = this.add.container(0, 0).setDepth(31);
     const kg = this.add.graphics();
-    kg.fillStyle(0x000000, 0.3).fillCircle(3, 6, 34);
-    kg.fillStyle(UI.ink, 1).fillCircle(0, 0, 34);
-    kg.fillStyle(UI.cream, 1).fillCircle(0, 0, 29);
-    kg.fillStyle(UI.orange, 1).fillCircle(0, 2, 20);
-    kg.fillStyle(shade(UI.orange, 1.3), 1).fillCircle(-5, -4, 9);
+    kg.fillStyle(0x000000, 0.3).fillCircle(3, 6, 40);
+    kg.fillStyle(UI.ink, 1).fillCircle(0, 0, 40);
+    kg.fillStyle(UI.cream, 1).fillCircle(0, 0, 34);
+    kg.fillStyle(UI.orange, 1).fillCircle(0, 2, 24);
+    kg.fillStyle(shade(UI.orange, 1.3), 1).fillCircle(-6, -5, 11);
     knob.add(kg);
     this.stick.c = sc; this.stick.knob = knob;
 
-    this.makeBtn('hit', 'GOLPE', 68, UI.orange, 'paddle');
-    this.makeBtn('jump', 'SALTO', 46, UI.teal, 'jump');
-    this.makeBtn('special', '', 48, UI.red, 'star');
+    this.makeBtn('hit', 'GOLPE', 80, UI.orange, 'paddle');
+    this.makeBtn('jump', 'SALTO', 56, UI.teal, 'jump');
+    this.makeBtn('special', '', 58, UI.red, 'star');
 
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       sfx.unlock();
@@ -231,7 +234,7 @@ export class HudScene extends Phaser.Scene {
       }
       const home = ctrlPos('stick', w, this.scale.height);
       const onStickSide = st.leftHanded ? p.x > w * 0.5 : p.x < w * 0.5;
-      const nearHome = Phaser.Math.Distance.Between(p.x, p.y, home.x, home.y) < 72 * st.stickScale * 1.7;
+      const nearHome = Phaser.Math.Distance.Between(p.x, p.y, home.x, home.y) < 84 * st.stickScale * 1.7;
       if (this.stick.pid < 0 && p.y > 100 && (st.stickMode === 'floating' ? onStickSide : nearHome)) {
         this.stick.pid = p.id;
         if (st.stickMode === 'floating') { this.stick.ox = p.x; this.stick.oy = p.y; } else { this.stick.ox = home.x; this.stick.oy = home.y; }
@@ -260,7 +263,7 @@ export class HudScene extends Phaser.Scene {
   private moveStick(p: Phaser.Input.Pointer) {
     const sc = getSettings().stickScale;
     const dx = p.x - this.stick.ox, dy = p.y - this.stick.oy;
-    const len = Math.hypot(dx, dy), max = 56 * sc;
+    const len = Math.hypot(dx, dy), max = 64 * sc;
     const k = len > max ? max / len : 1;
     this.stick.knob.setPosition(this.stick.ox + dx * k, this.stick.oy + dy * k);
     const dead = 8 * sc;
@@ -277,8 +280,8 @@ export class HudScene extends Phaser.Scene {
 
   private layout() {
     const w = this.scale.width, h = this.scale.height;
-    this.panelTop.setPosition(w / 2, 8).setScale(Math.min(1.25, (w - 260) / 600));
-    this.pauseBtn.setPosition(56, 48).setScale(1.1);
+    this.panelTop.setPosition(w / 2, 8).setScale(Math.min(1.4, (w - 240) / 600));
+    this.pauseBtn.setPosition(60, 52);
     const st = getSettings();
     if (this.stick.pid < 0) this.layoutStick();
     for (const b of this.btns) {
@@ -287,6 +290,7 @@ export class HudScene extends Phaser.Scene {
     }
     this.hint.setPosition(w / 2, h - 70);
     const show = this.touch || this.edit;
+    this.panelTop.setVisible(!this.standalone && !(this.edit && this.editMode === 'settings'));
     const a = this.edit ? Math.max(0.7, st.opacity) : st.opacity;
     this.stick.c.setVisible(show).setAlpha(a); this.stick.knob.setVisible(show).setAlpha(a);
     for (const b of this.btns) b.c.setVisible(show).setAlpha(a);
@@ -296,7 +300,7 @@ export class HudScene extends Phaser.Scene {
   private startDrag(p: Phaser.Input.Pointer) {
     const st = getSettings();
     const objs = [
-      { id: 'stick' as CtrlId, x: this.stick.c.x, y: this.stick.c.y, r: 72 * st.stickScale },
+      { id: 'stick' as CtrlId, x: this.stick.c.x, y: this.stick.c.y, r: 84 * st.stickScale },
       ...this.btns.map((b) => ({ id: b.key as CtrlId, x: b.c.x, y: b.c.y, r: b.r * st.btnScale })),
     ];
     const hit = objs.find((c) => Phaser.Math.Distance.Between(p.x, p.y, c.x, c.y) < c.r + 16);
@@ -317,7 +321,7 @@ export class HudScene extends Phaser.Scene {
     this.edit = on;
     this.pauseUi?.destroy(); this.pauseUi = undefined;
     this.editUi?.destroy(); this.editUi = undefined;
-    if (on) {
+    if (on && this.editMode === 'place') {
       const w = this.scale.width;
       const c = this.add.container(0, 0).setDepth(80);
       const p = panel(this, w / 2, 170, 460, 130, { title: 'COLOCAR', titleColor: UI.orange });
@@ -340,13 +344,13 @@ export class HudScene extends Phaser.Scene {
     const w = this.scale.width, h = this.scale.height;
     const c = this.add.container(0, 0).setDepth(90);
     c.add(this.add.rectangle(0, 0, w, h, 0x0b1a2a, 0.6).setOrigin(0).setInteractive());
-    const p = panel(this, w / 2, h / 2 + 20, 420, 360, { title: 'PAUSA', titleColor: UI.teal });
+    const p = panel(this, w / 2, h / 2 + 24, 500, 420, { title: 'PAUSA', titleColor: UI.teal });
     const items: [string, IconName, number, () => void][] = [
       ['CONTINUAR', 'play', UI.green, () => this.resume()],
       ['AJUSTES', 'gear', UI.orange, () => { this.pauseUi?.destroy(); this.pauseUi = undefined; this.scene.launch('Settings', { from: 'hud' }); this.scene.bringToTop('Settings'); }],
       ['MENÚ', 'home', UI.blue, () => { this.scene.resume('Match'); this.backToMenu(); }],
     ];
-    items.forEach(([t, ic, col, cb], i) => p.add(button(this, 0, -80 + i * 88, 320, 66, t, cb, { color: col, icon: ic, size: 26 }).c));
+    items.forEach(([t, ic, col, cb], i) => p.add(button(this, 0, -96 + i * 104, 400, 82, t, cb, { color: col, icon: ic, size: 34 }).c));
     c.add(p);
     p.setScale(0.6).setAlpha(0);
     this.tweens.add({ targets: p, scale: 1, alpha: 1, duration: 220, ease: 'Back.Out' });
@@ -398,7 +402,7 @@ export class HudScene extends Phaser.Scene {
       const t = this.add.text(x, 0, String(from), { fontFamily: TITLE_FONT, fontSize: '64px', color: col }).setOrigin(0.5);
       const ng = this.add.graphics();
       block(ng, x - 62, 70, 124, 30, nameCol, { shadow: false });
-      board.add([cg, t, ng, label(this, x, 85, name, 15)]);
+      board.add([cg, t, ng, label(this, x, 85, name, 20)]);
       if (changed) {
         this.tweens.add({ targets: [cg, t], scaleY: 0, duration: 140, delay: 450, yoyo: true, onYoyo: () => { t.setText(String(to)); sfx.flip(); } });
       } else t.setText(String(to));
@@ -445,10 +449,10 @@ export class HudScene extends Phaser.Scene {
       const yy = -58 + i * 48;
       const rg = this.add.graphics();
       block(rg, -80, yy - 20, 340, 40, UI.inkSoft, { shadow: false, border: 3 });
-      p.add([rg, label(this, -60, yy, k, 18).setOrigin(0, 0.5), label(this, 238, yy, v, 20, '#ffd23f').setOrigin(1, 0.5)]);
+      p.add([rg, label(this, -60, yy, k, 24).setOrigin(0, 0.5), label(this, 238, yy, v, 26, '#ffd23f').setOrigin(1, 0.5)]);
     });
-    p.add(button(this, -150, 178, 260, 66, 'REVANCHA', () => { const m = this.scene.get('Match') as any; m.scene.restart(m.cfg); this.scene.restart(); }, { color: UI.orange, icon: 'retry', size: 24 }).c);
-    p.add(button(this, 150, 178, 260, 66, 'MENÚ', () => this.backToMenu(), { color: UI.blue, icon: 'home', size: 24 }).c);
+    p.add(button(this, -150, 172, 270, 78, 'REVANCHA', () => { const m = this.scene.get('Match') as any; m.scene.restart(m.cfg); this.scene.restart(); }, { color: UI.orange, icon: 'retry', size: 30 }).c);
+    p.add(button(this, 150, 172, 270, 78, 'MENÚ', () => this.backToMenu(), { color: UI.blue, icon: 'home', size: 30 }).c);
     c.add(p);
     p.setScale(0.5).setAlpha(0);
     this.tweens.add({ targets: p, scale: 1, alpha: 1, duration: 420, ease: 'Back.Out' });

@@ -15,7 +15,7 @@ export class MenuScene extends Phaser.Scene {
 
   create() {
     this.root = this.add.container(0, 0);
-    applyRetro(this.cameras.main, 360);
+    applyRetro(this.cameras.main, 2000);
     this.build();
     this.scale.on('resize', this.build, this);
     this.events.once('shutdown', () => this.scale.off('resize', this.build, this));
@@ -56,56 +56,56 @@ export class MenuScene extends Phaser.Scene {
     this.tweens.add({ targets: [t2], y: ly + 82, yoyo: true, repeat: -1, duration: 1100, delay: 250, ease: 'Sine.InOut' });
     // cinta "torneo de palas"
     const rib = this.add.graphics();
-    const rw = 360, ry = ly + 160;
+    const rw = 420, ry = ly + 166;
     rib.fillStyle(shade(UI.red, 0.6), 1).fillTriangle(lx - rw / 2 - 30, ry + 6, lx - rw / 2, ry - 10, lx - rw / 2, ry + 26);
     rib.fillTriangle(lx + rw / 2 + 30, ry + 6, lx + rw / 2, ry - 10, lx + rw / 2, ry + 26);
-    block(rib, lx - rw / 2, ry - 22, rw, 46, UI.red);
+    block(rib, lx - rw / 2, ry - 26, rw, 54, UI.red);
     c.add(rib);
-    c.add(label(this, lx, ry, 'TORNEO DE PALAS', 24, '#fff3d6'));
+    c.add(label(this, lx, ry, 'TORNEO DE PALAS', 30, '#fff3d6'));
 
     // ---- letrero de opciones
-    const pw = Math.min(560, w * 0.42), ph = Math.min(560, h - 60);
+    const pw = Math.min(640, w * 0.46), ph = Math.min(640, h - 40);
     const px = w - pw / 2 - 30, py = h / 2 + 10;
     const p = panel(this, px, py, pw, ph, { wood: true, title: 'NUEVO PARTIDO', titleColor: UI.orange });
     c.add(p);
     let y = -ph / 2 + 64;
-    p.add(label(this, -pw / 2 + 30, y, 'DEPORTE', 20, '#fff3d6').setOrigin(0, 0.5));
-    y += 52;
+    p.add(label(this, -pw / 2 + 30, y, 'DEPORTE', 26, '#fff3d6').setOrigin(0, 0.5));
+    y += 66;
     const cw = (pw - 60) / 3;
     const icons: IconName[] = ['paddle', 'volley', 'foot'];
     SPORTS.forEach((s, i) => {
       const cx = -pw / 2 + 30 + cw * i + cw / 2;
       const card = this.add.graphics();
-      block(card, cx - cw / 2 + 4, y - 40, cw - 8, 92, s.available ? UI.teal : 0x55607e);
-      icon(card, icons[i], cx, y - 8, 40, s.available ? UI.cream : 0xb8c0d4);
+      block(card, cx - cw / 2 + 4, y - 46, cw - 8, 108, s.available ? UI.teal : 0x55607e);
+      icon(card, icons[i], cx, y - 12, 48, s.available ? UI.cream : 0xb8c0d4);
       p.add(card);
-      p.add(label(this, cx, y + 30, s.name, 15, s.available ? '#fff3d6' : '#c8cfe0'));
+      p.add(label(this, cx, y + 36, s.name, 20, s.available ? '#fff3d6' : '#c8cfe0'));
       if (!s.available) {
         const lk = this.add.graphics();
-        block(lk, cx + cw / 2 - 46, y - 52, 40, 34, UI.ink, { shadow: false });
-        icon(lk, 'lock', cx + cw / 2 - 26, y - 35, 22, UI.yellow);
+        block(lk, cx + cw / 2 - 50, y - 60, 44, 38, UI.ink, { shadow: false });
+        icon(lk, 'lock', cx + cw / 2 - 28, y - 41, 26, UI.yellow);
         p.add(lk);
       }
     });
-    y += 92;
-    p.add(label(this, -pw / 2 + 30, y, 'DIFICULTAD', 20, '#fff3d6').setOrigin(0, 0.5));
-    y += 46;
+    y += 104;
+    p.add(label(this, -pw / 2 + 30, y, 'DIFICULTAD', 26, '#fff3d6').setOrigin(0, 0.5));
+    y += 54;
     const levels: ('facil' | 'normal' | 'dificil')[] = ['facil', 'normal', 'dificil'];
-    p.add(segmented(this, 0, y, pw - 60, 50, ['FÁCIL', 'NORMAL', 'DIFÍCIL'], levels.indexOf(this.difficulty), (i) => { this.difficulty = levels[i]; }, UI.teal));
-    y += 62;
-    p.add(label(this, -pw / 2 + 30, y, 'PUNTOS', 20, '#fff3d6').setOrigin(0, 0.5));
-    y += 46;
+    p.add(segmented(this, 0, y, pw - 60, 62, ['FÁCIL', 'NORMAL', 'DIFÍCIL'], levels.indexOf(this.difficulty), (i) => { this.difficulty = levels[i]; }, UI.teal));
+    y += 72;
+    p.add(label(this, -pw / 2 + 30, y, 'PUNTOS', 26, '#fff3d6').setOrigin(0, 0.5));
+    y += 54;
     const pts = [5, 7, 11];
-    p.add(segmented(this, 0, y, pw - 60, 50, pts.map((n) => `A ${n}`), pts.indexOf(this.points), (i) => { this.points = pts[i]; }, UI.teal));
-    const play = button(this, 0, ph / 2 - 62, pw - 80, 78, '¡JUGAR!', () => this.start(), { color: UI.orange, icon: 'play', size: 34 });
+    p.add(segmented(this, 0, y, pw - 60, 62, pts.map((n) => `A ${n}`), pts.indexOf(this.points), (i) => { this.points = pts[i]; }, UI.teal));
+    const play = button(this, 0, ph / 2 - 64, pw - 70, 92, '¡JUGAR!', () => this.start(), { color: UI.orange, icon: 'play', size: 42 });
     p.add(play.c);
     this.tweens.add({ targets: play.c, scale: 1.04, yoyo: true, repeat: -1, duration: 650, ease: 'Sine.InOut' });
 
     // ---- botones secundarios
-    const gear = button(this, 70, h - 56, 110, 60, '', () => { this.scene.launch('Settings', { from: 'menu' }); this.scene.stop(); }, { icon: 'gear', color: UI.inkSoft });
-    const lab = button(this, 196, h - 56, 110, 60, '', () => { this.scene.stop('Match'); this.scene.start('Lab'); }, { icon: 'flask', color: UI.inkSoft });
+    const gear = button(this, 78, h - 62, 124, 76, '', () => { this.scene.launch('Settings', { from: 'menu' }); this.scene.stop(); }, { icon: 'gear', color: UI.inkSoft });
+    const lab = button(this, 216, h - 62, 124, 76, '', () => { this.scene.stop('Match'); this.scene.start('Lab'); }, { icon: 'flask', color: UI.inkSoft });
     c.add([gear.c, lab.c]);
-    c.add([label(this, 70, h - 102, 'AJUSTES', 14), label(this, 196, h - 102, 'LAB', 14)]);
+    c.add([label(this, 78, h - 118, 'AJUSTES', 20), label(this, 216, h - 118, 'LAB', 20)]);
 
     if (backendEnabled) {
       const st = label(this, w * 0.27, h - 56, 'Conectando…', 16).setOrigin(0.5);

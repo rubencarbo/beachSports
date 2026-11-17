@@ -79,15 +79,15 @@ export function panel(scene: Phaser.Scene, x: number, y: number, w: number, h: n
   }
   c.add(g);
   if (opts.title) {
-    const tw = Math.min(w - 40, Math.max(200, opts.title.length * 22 + 60));
+    const tw = Math.min(w - 40, Math.max(220, opts.title.length * 27 + 70));
     const tg = scene.add.graphics();
     const tc = opts.titleColor ?? UI.orange;
     // cinta con colas
     tg.fillStyle(shade(tc, 0.6), 1).fillTriangle(-tw / 2 - 26, -h / 2 + 6, -tw / 2, -h / 2 - 6, -tw / 2, -h / 2 + 30);
     tg.fillTriangle(tw / 2 + 26, -h / 2 + 6, tw / 2, -h / 2 - 6, tw / 2, -h / 2 + 30);
-    block(tg, -tw / 2, -h / 2 - 22, tw, 48, tc);
+    block(tg, -tw / 2, -h / 2 - 26, tw, 56, tc);
     c.add(tg);
-    c.add(label(scene, 0, -h / 2 + 2, opts.title, 22, '#fff3d6', { title: true }));
+    c.add(label(scene, 0, -h / 2 + 2, opts.title, 26, '#fff3d6', { title: true }));
   }
   return c;
 }
@@ -153,7 +153,7 @@ export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: 
   const c = scene.add.container(x, y);
   const g = scene.add.graphics();
   const ig = scene.add.graphics();
-  const size = opts.size ?? Math.round(h * 0.38);
+  const size = opts.size ?? Math.round(h * 0.42);
   const t = label(scene, opts.icon && text ? size * 0.7 : 0, 0, text, size);
   c.add([g, ig, t]);
   const DEPTH = 6;
@@ -188,7 +188,7 @@ export function segmented(scene: Phaser.Scene, x: number, y: number, w: number, 
   const btns: Button[] = [];
   options.forEach((o, i) => {
     const b = button(scene, -w / 2 + bw * i + bw / 2, 0, bw - 6, h, o, () => { btns.forEach((bb, j) => bb.setActive(j === i)); onChange(i); },
-      { active: i === active, activeColor: color, size: Math.round(h * 0.4) });
+      { active: i === active, activeColor: color, size: Math.round(h * 0.42) });
     btns.push(b);
     c.add(b.c);
   });
@@ -200,7 +200,7 @@ export function slider(scene: Phaser.Scene, x: number, y: number, w: number, val
   const c = scene.add.container(x, y);
   const g = scene.add.graphics();
   const knob = scene.add.graphics();
-  const val = label(scene, w / 2 + 44, 0, '', 18, '#ffd23f');
+  const val = label(scene, w / 2 + 50, 0, '', 24, '#ffd23f');
   c.add([g, knob, val]);
   const tw = w;
   const draw = (v: number) => {
