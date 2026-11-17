@@ -3,10 +3,9 @@ import { sfx } from '../core/audio';
 import { applyRetro } from '../fx/RetroPipeline';
 import { SPORTS } from '../sports';
 import { backendEnabled, getMyStats } from '../services/backend';
+import { IconName, UI, block, button, icon, label, panel, segmented, shade } from '../ui/kit';
 
-import { PIXEL_FONT as FONT } from '../core/fonts';
-
-/** Menú sobre una partida de demostración (CPU vs CPU) que sirve de fondo animado. */
+/** Menú principal sobre una partida de demostración (CPU vs CPU) que sirve de fondo animado. */
 export class MenuScene extends Phaser.Scene {
   private difficulty: 'facil' | 'normal' | 'dificil' = 'normal';
   private points = 7;
@@ -20,86 +19,104 @@ export class MenuScene extends Phaser.Scene {
     this.build();
     this.scale.on('resize', this.build, this);
     this.events.once('shutdown', () => this.scale.off('resize', this.build, this));
+    this.input.keyboard?.once('keydown-ENTER', () => this.start());
   }
 
   private build() {
     this.root.removeAll(true);
     const w = this.scale.width, h = this.scale.height;
     const c = this.root;
-    const shade = this.add.graphics();
-    shade.fillGradientStyle(0x0b1a2a, 0x0b1a2a, 0x0b1a2a, 0x0b1a2a, 0.55, 0.55, 0.1, 0.1);
-    shade.fillRect(0, 0, w, h * 0.62);
-    c.add(shade);
-    const title = this.add.text(w / 2, h * 0.14, 'BEACH SPORTS', {
-      fontFamily: FONT, fontSize: '52px', color: '#ffd23f', stroke: '#c4520c', strokeThickness: 8,
-      shadow: { offsetX: 0, offsetY: 6, color: '#00000088', blur: 0, fill: true, stroke: true },
-    }).setOrigin(0.5);
-    c.add(title);
-    this.tweens.add({ targets: title, scale: 1.04, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.InOut' });
-    c.add(this.add.text(w / 2, h * 0.14 + 62, 'Torneo de playa', { fontFamily: FONT, fontSize: '16px', color: '#fff', stroke: '#1d2a3a', strokeThickness: 4 }).setOrigin(0.5));
 
-    // deportes
-    const sy = h * 0.42;
+    // viñeta a la izquierda para que el logo destaque sobre la demo
+    const shadeG = this.add.graphics();
+    shadeG.fillGradientStyle(0x0b1a2a, 0x0b1a2a, 0x0b1a2a, 0x0b1a2a, 0.65, 0, 0.65, 0);
+    shadeG.fillRect(0, 0, w * 0.6, h);
+    c.add(shadeG);
+
+    // ---- logotipo
+    const lx = w * 0.27, ly = h * 0.24;
+    const sun = this.add.graphics().setPosition(lx + 150, ly - 40);
+    sun.fillStyle(UI.yellow, 1).fillCircle(0, 0, 46);
+    sun.fillStyle(shade(UI.yellow, 1.12), 1).fillCircle(-8, -8, 30);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      sun.fillStyle(UI.orange, 1).fillRect(Math.cos(a) * 60 - 6, Math.sin(a) * 60 - 6, 12, 12);
+    }
+    c.add(sun);
+    this.tweens.add({ targets: sun, angle: 360, duration: 24000, repeat: -1 });
+    const mk = (y: number, t: string, size: number, fill: string, stroke: string) => {
+      const sh = this.add.text(lx + 6, y + 8, t, { fontFamily: '"Press Start 2P", monospace', fontSize: `${size}px`, color: '#1b2240' }).setOrigin(0.5);
+      const tx = this.add.text(lx, y, t, { fontFamily: '"Press Start 2P", monospace', fontSize: `${size}px`, color: fill, stroke, strokeThickness: Math.round(size / 5) }).setOrigin(0.5);
+      c.add([sh, tx]);
+      return tx;
+    };
+    const t1 = mk(ly, 'BEACH', 72, '#ffd23f', '#c4420c');
+    const t2 = mk(ly + 86, 'SPORTS', 56, '#5fe0f0', '#0e5f8f');
+    this.tweens.add({ targets: [t1], y: ly - 4, yoyo: true, repeat: -1, duration: 1100, ease: 'Sine.InOut' });
+    this.tweens.add({ targets: [t2], y: ly + 82, yoyo: true, repeat: -1, duration: 1100, delay: 250, ease: 'Sine.InOut' });
+    // cinta "torneo de palas"
+    const rib = this.add.graphics();
+    const rw = 360, ry = ly + 160;
+    rib.fillStyle(shade(UI.red, 0.6), 1).fillTriangle(lx - rw / 2 - 30, ry + 6, lx - rw / 2, ry - 10, lx - rw / 2, ry + 26);
+    rib.fillTriangle(lx + rw / 2 + 30, ry + 6, lx + rw / 2, ry - 10, lx + rw / 2, ry + 26);
+    block(rib, lx - rw / 2, ry - 22, rw, 46, UI.red);
+    c.add(rib);
+    c.add(label(this, lx, ry, 'TORNEO DE PALAS', 24, '#fff3d6'));
+
+    // ---- letrero de opciones
+    const pw = Math.min(560, w * 0.42), ph = Math.min(560, h - 60);
+    const px = w - pw / 2 - 30, py = h / 2 + 10;
+    const p = panel(this, px, py, pw, ph, { wood: true, title: 'NUEVO PARTIDO', titleColor: UI.orange });
+    c.add(p);
+    let y = -ph / 2 + 64;
+    p.add(label(this, -pw / 2 + 30, y, 'DEPORTE', 20, '#fff3d6').setOrigin(0, 0.5));
+    y += 52;
+    const cw = (pw - 60) / 3;
+    const icons: IconName[] = ['paddle', 'volley', 'foot'];
     SPORTS.forEach((s, i) => {
-      const x = w / 2 + (i - 1) * 230;
-      const b = this.add.text(x, sy, s.name, {
-        fontFamily: FONT, fontSize: '16px', color: s.available ? '#fff' : '#ffffffaa',
-        backgroundColor: s.available ? '#ff8a1f' : '#2b3b4f', padding: { x: 18, y: 10 },
-      }).setOrigin(0.5);
-      c.add(b);
-      if (!s.available) c.add(this.add.text(x, sy + 34, 'PROXIMAMENTE', { fontFamily: FONT, fontSize: '8px', color: '#ffd23f' }).setOrigin(0.5));
+      const cx = -pw / 2 + 30 + cw * i + cw / 2;
+      const card = this.add.graphics();
+      block(card, cx - cw / 2 + 4, y - 40, cw - 8, 92, s.available ? UI.teal : 0x55607e);
+      icon(card, icons[i], cx, y - 8, 40, s.available ? UI.cream : 0xb8c0d4);
+      p.add(card);
+      p.add(label(this, cx, y + 30, s.name, 15, s.available ? '#fff3d6' : '#c8cfe0'));
+      if (!s.available) {
+        const lk = this.add.graphics();
+        block(lk, cx + cw / 2 - 46, y - 52, 40, 34, UI.ink, { shadow: false });
+        icon(lk, 'lock', cx + cw / 2 - 26, y - 35, 22, UI.yellow);
+        p.add(lk);
+      }
     });
+    y += 92;
+    p.add(label(this, -pw / 2 + 30, y, 'DIFICULTAD', 20, '#fff3d6').setOrigin(0, 0.5));
+    y += 46;
+    const levels: ('facil' | 'normal' | 'dificil')[] = ['facil', 'normal', 'dificil'];
+    p.add(segmented(this, 0, y, pw - 60, 50, ['FÁCIL', 'NORMAL', 'DIFÍCIL'], levels.indexOf(this.difficulty), (i) => { this.difficulty = levels[i]; }, UI.teal));
+    y += 62;
+    p.add(label(this, -pw / 2 + 30, y, 'PUNTOS', 20, '#fff3d6').setOrigin(0, 0.5));
+    y += 46;
+    const pts = [5, 7, 11];
+    p.add(segmented(this, 0, y, pw - 60, 50, pts.map((n) => `A ${n}`), pts.indexOf(this.points), (i) => { this.points = pts[i]; }, UI.teal));
+    const play = button(this, 0, ph / 2 - 62, pw - 80, 78, '¡JUGAR!', () => this.start(), { color: UI.orange, icon: 'play', size: 34 });
+    p.add(play.c);
+    this.tweens.add({ targets: play.c, scale: 1.04, yoyo: true, repeat: -1, duration: 650, ease: 'Sine.InOut' });
 
-    // dificultad
-    const dy = h * 0.58;
-    const levels: [typeof this.difficulty, string][] = [['facil', 'FACIL'], ['normal', 'NORMAL'], ['dificil', 'DIFICIL']];
-    levels.forEach(([id, label], i) => {
-      const b = this.add.text(w / 2 + (i - 1) * 160, dy, label, {
-        fontFamily: FONT, fontSize: '16px', color: '#fff',
-        backgroundColor: this.difficulty === id ? '#25a8a8' : '#1d2a3acc', padding: { x: 14, y: 8 },
-      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      b.on('pointerdown', () => { sfx.unlock(); sfx.ui(); this.difficulty = id; this.build(); });
-      c.add(b);
-    });
-    // puntos
-    const py = h * 0.69;
-    [5, 7, 11].forEach((p, i) => {
-      const b = this.add.text(w / 2 + (i - 1) * 140, py, `A ${p}`, {
-        fontFamily: FONT, fontSize: '12px', color: '#fff',
-        backgroundColor: this.points === p ? '#25a8a8' : '#1d2a3acc', padding: { x: 14, y: 6 },
-      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      b.on('pointerdown', () => { sfx.unlock(); sfx.ui(); this.points = p; this.build(); });
-      c.add(b);
-    });
-
-    const play = this.add.text(w / 2, h * 0.85, '¡JUGAR!', {
-      fontFamily: FONT, fontSize: '32px', color: '#fff', backgroundColor: '#e0322a', padding: { x: 40, y: 12 },
-      stroke: '#7a1010', strokeThickness: 4,
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    this.tweens.add({ targets: play, scale: 1.07, yoyo: true, repeat: -1, duration: 600 });
-    play.on('pointerdown', () => this.start());
-    c.add(play);
-    this.input.keyboard?.once('keydown-ENTER', () => this.start());
-    const gear = this.add.text(w - 16, 16, 'AJUSTES', { fontFamily: FONT, fontSize: '12px', color: '#fff', backgroundColor: '#1d2a3acc', padding: { x: 10, y: 8 } })
-      .setOrigin(1, 0).setInteractive({ useHandCursor: true });
-    gear.on('pointerdown', () => { sfx.unlock(); sfx.ui(); this.scene.launch('Settings', { from: 'menu' }); this.scene.stop(); });
-    c.add(gear);
-    const lab = this.add.text(16, 16, 'LAB', { fontFamily: FONT, fontSize: '12px', color: '#fff', backgroundColor: '#1d2a3acc', padding: { x: 10, y: 8 } })
-      .setOrigin(0, 0).setInteractive({ useHandCursor: true });
-    lab.on('pointerdown', () => { sfx.ui(); this.scene.stop('Match'); this.scene.start('Lab'); });
-    c.add(lab);
+    // ---- botones secundarios
+    const gear = button(this, 70, h - 56, 110, 60, '', () => { this.scene.launch('Settings', { from: 'menu' }); this.scene.stop(); }, { icon: 'gear', color: UI.inkSoft });
+    const lab = button(this, 196, h - 56, 110, 60, '', () => { this.scene.stop('Match'); this.scene.start('Lab'); }, { icon: 'flask', color: UI.inkSoft });
+    c.add([gear.c, lab.c]);
+    c.add([label(this, 70, h - 102, 'AJUSTES', 14), label(this, 196, h - 102, 'LAB', 14)]);
 
     if (backendEnabled) {
-      const st = this.add.text(w - 16, h - 12, 'Conectando…', { fontFamily: FONT, fontSize: '8px', color: '#fff' }).setOrigin(1, 1);
+      const st = label(this, w * 0.27, h - 56, 'Conectando…', 16).setOrigin(0.5);
       c.add(st);
-      getMyStats().then((s) => st.active && st.setText(s ? `Partidas: ${s.played ?? 0} · Victorias: ${s.wins ?? 0}` : 'Offline'));
+      getMyStats().then((s) => st.active && st.setText(s ? `Partidas ${s.played ?? 0} · Victorias ${s.wins ?? 0}` : 'Sin conexión'));
     }
   }
 
-  private start() {
+  start() {
     sfx.unlock();
     sfx.ui();
-    // pantalla completa donde se pueda (Android/escritorio; en iPhone usar "Añadir a pantalla de inicio")
     const el = document.documentElement as any;
     if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {});
     (screen.orientation as any)?.lock?.('landscape').catch?.(() => {});

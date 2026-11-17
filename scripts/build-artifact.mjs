@@ -15,7 +15,7 @@ const js = readdirSync(`${out}/assets`).find((f) => f.endsWith('.js'));
 let code = readFileSync(`${out}/assets/${js}`, 'utf8').replace(/<\/script/gi, '<\\/script');
 const html = `<title>Beach Sports</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   /* Mundo único de juego (playa soleada): una sola apariencia, colores explícitos */
   :root { --sky: #5c8ad1; --panel: #1d2a3a; --ink: #ffffff; color-scheme: light; }

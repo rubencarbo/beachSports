@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
-import { sfx } from '../core/audio';
-import { PIXEL_FONT as FONT } from '../core/fonts';
-import { Settings, getSettings, resetSettings, updateSettings } from '../core/settings';
+import { getSettings, resetSettings, updateSettings } from '../core/settings';
+import { applyRetro } from '../fx/RetroPipeline';
+import { UI, button, label, panel, segmented, slider } from '../ui/kit';
 
-/** Pantalla de ajustes de controles: tamaños, transparencia, tipo de cruceta, zurdo y colocación. */
+/** Ajustes: tamaños, transparencia, cruceta, mano, ayudas de juego y colocación de controles. */
 export class SettingsScene extends Phaser.Scene {
   private from: 'menu' | 'hud' = 'menu';
   private root!: Phaser.GameObjects.Container;
@@ -13,7 +13,9 @@ export class SettingsScene extends Phaser.Scene {
   init(d: { from?: 'menu' | 'hud' }) { this.from = d.from ?? 'menu'; }
 
   create() {
+    this.scene.bringToTop();
     this.root = this.add.container(0, 0);
+    applyRetro(this.cameras.main, 360);
     this.build();
     this.scale.on('resize', this.build, this);
     this.events.once('shutdown', () => this.scale.off('resize', this.build, this));
@@ -23,75 +25,39 @@ export class SettingsScene extends Phaser.Scene {
     this.root.removeAll(true);
     const w = this.scale.width, h = this.scale.height, s = getSettings();
     const c = this.root;
-    const pw = Math.min(760, w - 40), ph = Math.min(560, h - 30);
-    const x0 = w / 2 - pw / 2, y0 = h / 2 - ph / 2;
-    const bg = this.add.graphics();
-    bg.fillStyle(0x0b1a2a, 0.6).fillRect(0, 0, w, h);
-    bg.fillStyle(0x1d2a3a, 0.97).fillRect(x0, y0, pw, ph);
-    bg.lineStyle(4, 0xffc23a, 1).strokeRect(x0, y0, pw, ph);
-    bg.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains); // bloquea toques al fondo
-    c.add(bg);
-    c.add(this.add.text(w / 2, y0 + 30, 'AJUSTES DE CONTROLES', { fontFamily: FONT, fontSize: '20px', color: '#ffd23f' }).setOrigin(0.5));
-
-    const rowH = Math.min(62, (ph - 150) / 7);
-    let y = y0 + 80;
-    const label = (t: string) => c.add(this.add.text(x0 + 30, y, t, { fontFamily: FONT, fontSize: '14px', color: '#fff' }).setOrigin(0, 0.5));
-    const slider = (t: string, key: 'stickScale' | 'btnScale' | 'opacity', min: number, max: number, fmt: (v: number) => string) => {
-      label(t);
-      const tx = x0 + pw * 0.45, tw = pw * 0.38, ty = y;
-      const track = this.add.rectangle(tx, ty, tw, 8, 0x4a5a70).setOrigin(0, 0.5);
-      const fill = this.add.rectangle(tx, ty, 0, 8, 0xff8a1f).setOrigin(0, 0.5);
-      const knob = this.add.rectangle(0, ty, 22, 30, 0xffffff).setStrokeStyle(3, 0x1d2a3a);
-      const val = this.add.text(tx + tw + 18, ty, '', { fontFamily: FONT, fontSize: '12px', color: '#ffd29a' }).setOrigin(0, 0.5);
-      const set = (v: number, save: boolean) => {
-        v = Phaser.Math.Clamp(v, min, max);
-        const f = (v - min) / (max - min);
-        knob.x = tx + f * tw; fill.width = f * tw; val.setText(fmt(v));
-        if (save) updateSettings({ [key]: Math.round(v * 100) / 100 } as Partial<Settings>);
-      };
-      set(s[key], false);
-      const hit = this.add.rectangle(tx + tw / 2, ty, tw + 40, 50, 0, 0).setInteractive({ draggable: true, useHandCursor: true });
-      const fromX = (px: number) => min + ((px - tx) / tw) * (max - min);
-      hit.on('pointerdown', (p: Phaser.Input.Pointer) => set(fromX(p.x), true));
-      hit.on('drag', (p: Phaser.Input.Pointer) => set(fromX(p.x), true));
-      c.add([track, fill, knob, val, hit]);
-      y += rowH;
+    c.add(this.add.rectangle(0, 0, w, h, 0x0b1a2a, 0.6).setOrigin(0).setInteractive());
+    const pw = Math.min(920, w - 40), ph = Math.min(640, h - 50);
+    const p = panel(this, w / 2, h / 2 + 18, pw, ph, { title: 'AJUSTES', titleColor: UI.orange, wood: true });
+    c.add(p);
+    const colL = -pw / 2 + 40;
+    const rows = 7;
+    const top = -ph / 2 + 62, step = (ph - 210) / (rows - 1);
+    const row = (i: number) => top + i * step;
+    const name = (i: number, t: string) => p.add(label(this, colL, row(i), t, 20).setOrigin(0, 0.5));
+    const cx = pw * 0.12, cw = pw * 0.5;
+    name(0, 'Tamaño cruceta');
+    p.add(slider(this, cx, row(0), cw * 0.8, s.stickScale, 0.6, 1.8, (v) => updateSettings({ stickScale: Math.round(v * 100) / 100 })));
+    name(1, 'Tamaño botones');
+    p.add(slider(this, cx, row(1), cw * 0.8, s.btnScale, 0.6, 1.8, (v) => updateSettings({ btnScale: Math.round(v * 100) / 100 })));
+    name(2, 'Transparencia');
+    p.add(slider(this, cx, row(2), cw * 0.8, s.opacity, 0.15, 1, (v) => updateSettings({ opacity: Math.round(v * 100) / 100 })));
+    const seg = (i: number, t: string, opts: string[], act: number, cb: (j: number) => void) => {
+      name(i, t);
+      p.add(segmented(this, cx + 20, row(i), cw, 46, opts, act, cb, UI.teal));
     };
-    const pct = (v: number) => `${Math.round(v * 100)}%`;
-    slider('TAMANO CRUCETA', 'stickScale', 0.6, 1.8, pct);
-    slider('TAMANO BOTONES', 'btnScale', 0.6, 1.8, pct);
-    slider('TRANSPARENCIA', 'opacity', 0.15, 1, pct);
+    seg(3, 'Cruceta', ['FLOTANTE', 'FIJA'], s.stickMode === 'floating' ? 0 : 1, (j) => updateSettings({ stickMode: j === 0 ? 'floating' : 'fixed' }));
+    seg(4, 'Mano', ['DIESTRO', 'ZURDO'], s.leftHanded ? 1 : 0, (j) => updateSettings({ leftHanded: j === 1 }));
+    seg(5, 'Movimiento', ['ASISTIDO', 'MANUAL'], s.assist ? 0 : 1, (j) => updateSettings({ assist: j === 0 }));
+    seg(6, 'Remate', ['AUTOMÁTICO', 'CON SALTO'], s.autoSmash ? 0 : 1, (j) => updateSettings({ autoSmash: j === 0 }));
 
-    const toggle = (t: string, a: string, b: string, isA: boolean, onA: () => void, onB: () => void) => {
-      label(t);
-      const bx = x0 + pw * 0.45;
-      for (const [i, txt, active, cb] of [[0, a, isA, onA], [1, b, !isA, onB]] as [number, string, boolean, () => void][]) {
-        const btn = this.add.text(bx + i * (pw * 0.2), y, txt, {
-          fontFamily: FONT, fontSize: '12px', color: '#fff', backgroundColor: active ? '#25a8a8' : '#33445a', padding: { x: 10, y: 8 },
-        }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-        btn.on('pointerdown', () => { sfx.ui(); cb(); this.build(); });
-        c.add(btn);
-      }
-      y += rowH;
-    };
-    toggle('CRUCETA', 'FLOTANTE', 'FIJA', s.stickMode === 'floating', () => updateSettings({ stickMode: 'floating' }), () => updateSettings({ stickMode: 'fixed' }));
-    toggle('MANO', 'DIESTRO', 'ZURDO', !s.leftHanded, () => updateSettings({ leftHanded: false }), () => updateSettings({ leftHanded: true }));
-    toggle('MOVIMIENTO', 'ASISTIDO', 'MANUAL', s.assist, () => updateSettings({ assist: true }), () => updateSettings({ assist: false }));
-    toggle('REMATE', 'AUTOMATICO', 'CON SALTO', s.autoSmash, () => updateSettings({ autoSmash: true }), () => updateSettings({ autoSmash: false }));
-
-    const by = y0 + ph - 40;
-    const btn = (x: number, t: string, col: string, cb: () => void) => {
-      const b = this.add.text(x, by, t, { fontFamily: FONT, fontSize: '13px', color: '#fff', backgroundColor: col, padding: { x: 12, y: 10 } })
-        .setOrigin(0.5).setInteractive({ useHandCursor: true });
-      b.on('pointerdown', () => { sfx.ui(); cb(); });
-      c.add(b);
-    };
-    btn(w / 2 - pw * 0.32, 'COLOCAR', '#ff8a1f', () => this.placeControls());
-    btn(w / 2, 'RESTABLECER', '#5a6a80', () => { resetSettings(); this.build(); });
-    btn(w / 2 + pw * 0.32, 'LISTO', '#e0322a', () => this.close());
+    const by = ph / 2 - 46;
+    const bw = (pw - 120) / 3;
+    p.add(button(this, -bw - 20, by, bw, 62, 'COLOCAR', () => this.placeControls(), { color: UI.orange, icon: 'move', size: 22 }).c);
+    p.add(button(this, 0, by, bw, 62, 'RESTABLECER', () => { resetSettings(); this.build(); }, { color: UI.grey, icon: 'retry', size: 20 }).c);
+    p.add(button(this, bw + 20, by, bw, 62, 'LISTO', () => this.close(), { color: UI.green, icon: 'check', size: 22 }).c);
+    p.setScale(Math.min(1, (h - 20) / (ph + 40)));
   }
 
-  /** Modo "colocar controles": la HUD muestra los controles arrastrables. */
   private placeControls() {
     if (this.from === 'hud') this.game.events.emit('hud-edit', true);
     else this.scene.launch('Hud', { edit: true, standalone: true });

@@ -30,7 +30,7 @@ export class BootScene extends Phaser.Scene {
     };
     // espera a la fuente (si está disponible) para que los textos salgan bien
     const fonts = (document as any).fonts;
-    if (fonts?.load) Promise.race([fonts.load('16px "Press Start 2P"'), new Promise((r) => setTimeout(r, 1500))]).then(go, go);
+    if (fonts?.load) Promise.race([Promise.all([fonts.load('16px "Press Start 2P"'), fonts.load('bold 16px "Pixelify Sans"')]), new Promise((r) => setTimeout(r, 2000))]).then(go, go);
     else go();
   }
 }

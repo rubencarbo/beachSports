@@ -549,7 +549,7 @@ export class MatchScene extends Phaser.Scene {
     w.mood = 'happy'; w.moodT = 99;
     sfx.cheer(2);
     this.stage.cheer(1);
-    this.game.events.emit('match-over', { winner, score: { a: this.score[-1], b: this.score[1] }, mode: this.cfg.mode });
+    this.game.events.emit('match-over', { winner, score: { a: this.score[-1], b: this.score[1] }, mode: this.cfg.mode, stats: { ...this.stats } });
     if (this.cfg.mode === 'play') {
       saveMatch({
         sport: this.rules.id, difficulty: this.cfg.difficulty, points: this.cfg.points,
