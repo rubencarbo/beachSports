@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playerInput } from './core/input';
 import { VIEW_H, VIEW_W } from './config';
 import { BootScene } from './scenes/BootScene';
 import { HudScene } from './scenes/HudScene';
@@ -34,3 +35,4 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 (window as any).__game = game;
+(window as any).__inp = playerInput;

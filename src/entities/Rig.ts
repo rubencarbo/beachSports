@@ -146,7 +146,6 @@ export class Rig {
     this.container.add([
       mk('upperB', 'upperarm', true), mk('foreB', 'forearm', true),
       mk('thighB', 'thigh', true), mk('lowerB', 'lowerleg', true),
-      ...(has('hairtuft') ? [mk('tuft', 'hairtuft')] : []),
       mk('torso', 'torso'),
       mk('thighF', 'thigh'), mk('lowerF', 'lowerleg'),
       mk('head', 'head'),
@@ -157,7 +156,6 @@ export class Rig {
     this.parts.foreF.setCrop(0, 0, fa.w, Math.round(fa.h * 0.66));
     this.parts.torso.setOrigin(this.A.hip[0] / this.F.torso.w, this.A.hip[1] / this.F.torso.h);
     this.setHead('head');
-    if (this.parts.tuft) this.parts.tuft.setOrigin(0.86, 0.42);
   }
 
   /** Anclajes anatómicos dentro de cada pieza (px de arte), medidos sobre la hoja importada. */

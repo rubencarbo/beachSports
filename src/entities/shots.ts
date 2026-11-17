@@ -3,7 +3,7 @@ import type { Side } from '../sports/types';
 import type { ShotKind } from './Ball';
 
 const FLIGHT: Record<ShotKind, number> = {
-  serve: 1.2, normal: 1.05, drive: 0.78, lob: 1.75, smash: 0.5, special: 0.44,
+  serve: 1.35, normal: 1.25, drive: 0.9, lob: 2.1, smash: 0.55, special: 0.46,
 };
 const DEPTH: Record<ShotKind, [number, number]> = {
   serve: [5, 7.2], normal: [4, 7.2], drive: [5.5, 7.6], lob: [6, 7.6], smash: [3, 6.5], special: [3.5, 7],

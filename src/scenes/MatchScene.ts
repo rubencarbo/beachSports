@@ -3,7 +3,8 @@ import { COURT, PHYS, PPM, RETRO_ROWS, VIEW_W, project, view } from '../config';
 import { applyRetro } from '../fx/RetroPipeline';
 import { sfx } from '../core/audio';
 import { playerInput } from '../core/input';
-import { AI_LEVELS, AiController } from '../entities/Ai';
+import { AI_LEVELS, AiController, InterceptPlan, planIntercept } from '../entities/Ai';
+import { getSettings } from '../core/settings';
 import { Ball, ShotKind } from '../entities/Ball';
 import { Intent, Player } from '../entities/Player';
 import { computeShot } from '../entities/shots';
@@ -201,10 +202,7 @@ export class MatchScene extends Phaser.Scene {
       const ai = this.ai.get(p.side);
       const opp = p === this.p1 ? this.p2 : this.p1;
       if (ai) intents.set(p.side, ai.think(dt, this.ball, opp, this.state === 'serve' && this.server === p.side));
-      else intents.set(p.side, {
-        mx: playerInput.mx, mz: playerInput.my,
-        hit: playerInput.consumeHit(), jump: playerInput.consumeJump(), special: playerInput.consumeSpecial(),
-      });
+      else intents.set(p.side, this.humanIntent(p));
     }
 
     for (const p of [this.p1, this.p2]) {
@@ -225,14 +223,24 @@ export class MatchScene extends Phaser.Scene {
         const tReach = Math.abs((p.x - b.x) / b.vx);
         p.prep = Phaser.Math.Clamp(1 - (tReach - 0.15) / 0.45, 0, 1);
       } else p.prep = Math.max(0, p.prep - realDt * 4);
+      if (!this.ai.has(p.side)) this.runAutoSmash(p);
       if (it.special) this.activateSpecial(p);
       if (it.hit) {
         if (serving && this.ball.held && this.serveTimer < 0) this.startServe(p);
         else if (this.state === 'rally' && p.swingT >= 0.7) {
-          p.hitBuffer = 0.24;
-          p.lastBallDist = 99;
-          p.startSwing(p.airborne && this.ball.y > 1.9 ? 'over' : 'fore');
-          sfx.whoosh();
+          const plan = this.ai.has(p.side) ? null : this.humanPlan;
+          if (plan && plan.smash && !p.airborne && getSettings().autoSmash) {
+            // remate automático: salta en el momento justo y remata en el aire
+            this.smashQueued = true;
+          } else {
+            p.hitBuffer = 0.24;
+            p.lastBallDist = 99;
+            this.pressLead = plan ? plan.t : 0.12;
+            // con asistencia el golpe espera a la bola (la calidad depende del momento de pulsar)
+            if (plan && getSettings().assist) p.hitBuffer = Math.min(0.6, plan.t + 0.15);
+            p.startSwing(p.airborne && this.ball.y > 1.9 ? 'over' : 'fore');
+            sfx.whoosh();
+          }
         }
       }
       if (p.powered) {
@@ -272,6 +280,10 @@ export class MatchScene extends Phaser.Scene {
     this.stage.drawCourt();
     this.stage.drawNet();
     this.stage.update(realDt, time);
+    // remate automático: arma el brazo al subir
+    if (this.autoOver && this.p1.airborne && this.p1.vy < 2.8 && this.p1.stage === 'none') { this.p1.startSwing('over'); sfx.whoosh(); }
+    if (!this.p1.airborne && this.p1.stage === 'none') this.autoOver = false;
+    this.drawRing();
     // render
     this.p1.render(time);
     this.p2.render(time);
@@ -311,6 +323,67 @@ export class MatchScene extends Phaser.Scene {
     this.fx.hitSpark(bp.x, bp.y);
   }
 
+  private humanPlan: InterceptPlan | null = null;
+  private smashQueued = false;
+  private pressLead = 0.12;
+  private ring?: Phaser.GameObjects.Graphics;
+
+  /** Entrada del jugador humano, con movimiento asistido opcional (como en el vídeo: siempre llega a la bola). */
+  private humanIntent(p: Player): Intent {
+    const it: Intent = {
+      mx: playerInput.mx, mz: playerInput.my,
+      hit: playerInput.consumeHit(), jump: playerInput.consumeJump(), special: playerInput.consumeSpecial(),
+    };
+    const b = this.ball;
+    const st = getSettings();
+    this.humanPlan = this.state === 'rally' && b.live && !b.held && b.lastHitter !== p.side ? planIntercept(b, p, st.autoSmash) : null;
+    if (st.assist && this.state === 'rally' && Math.hypot(it.mx, it.mz) < 0.55) {
+      const tgt = this.humanPlan ?? { x: p.side * 5.2, z: 4 + (b.z - 4) * 0.35 };
+      const dx = tgt.x - p.x, dz = tgt.z - p.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 0.1) {
+        const sp = Math.min(1, dist / 0.5) * (this.humanPlan ? 1 : 0.7);
+        it.mx = (dx / dist) * sp;
+        it.mz = ((dz / dist) * sp) / 0.85;
+      } else { it.mx = 0; it.mz = 0; }
+    }
+    if (!this.humanPlan) this.smashQueued = false;
+    return it;
+  }
+
+  /** Remate automático: salta cuando falta lo justo para que la bola llegue arriba. */
+  private runAutoSmash(p: Player) {
+    const plan = this.humanPlan;
+    if (!this.smashQueued || !plan) return;
+    const jumpTime = PHYS.jumpV / PHYS.gravity * 0.9 + 0.05;
+    if (!p.airborne && plan.smash && plan.t <= jumpTime) {
+      p.update(0, { mx: 0, mz: 0, hit: false, jump: true, special: false }, true);
+      p.hitBuffer = 0.9;
+      p.lastBallDist = 99;
+      this.pressLead = 0.12;
+      this.smashQueued = false;
+      this.autoOver = true;
+    }
+  }
+  private autoOver = false;
+
+  /** Anillo de golpeo en la arena: se cierra hasta el contacto y se pone verde en el momento perfecto. */
+  private drawRing() {
+    if (!this.ring) this.ring = this.add.graphics().setDepth(97);
+    const g = this.ring;
+    g.clear();
+    const plan = this.humanPlan;
+    const human = this.ai.has(-1) ? null : this.p1;
+    if (!plan || !human || this.cfg.mode !== 'play') return;
+    const c = project(plan.bx, 0, plan.bz);
+    const perfect = Math.abs(plan.t - 0.12) < 0.08;
+    const col = plan.smash ? 0xff8a1f : perfect ? 0x4dff6a : 0xffffff;
+    const r = (26 + Math.min(1.2, plan.t) * 90) * c.k;
+    g.lineStyle(4 * c.k, col, 0.9).strokeEllipse(c.x, c.y, r * 2, r * 0.7);
+    g.lineStyle(3 * c.k, col, 0.6).strokeEllipse(c.x, c.y, 26 * c.k * 2, 26 * c.k * 0.7);
+    g.fillStyle(col, perfect ? 0.35 : 0.15).fillEllipse(c.x, c.y, 26 * c.k * 2, 26 * c.k * 0.7);
+  }
+
   private activateSpecial(p: Player) {
     if (p.meter < 1 || p.powered || this.state === 'over') return;
     p.meter = 0;
@@ -345,6 +418,12 @@ export class MatchScene extends Phaser.Scene {
     const ai = this.ai.get(p.side);
     let q = Phaser.Math.Clamp(0.3 + 0.75 * (1 - d / PHYS.reach), 0, 1);
     if (ai) q = ai.qualityRoll;
+    else if (getSettings().assist) {
+      // calidad por el momento de pulsar: ideal ~0,12 s antes del contacto (el anillo se pone verde)
+      const timing = Phaser.Math.Clamp(1 - Math.abs(this.pressLead - 0.12) / 0.4, 0, 1);
+      q = Phaser.Math.Clamp(0.25 + 0.75 * timing, 0, 1);
+      if (p.airborne) q = Math.max(q, 0.75);
+    }
 
     // bola especial: sólo se devuelve con un golpe perfecto
     if (b.kind === 'special' && q < 0.86) {

@@ -99,32 +99,42 @@ export class AiController {
 
   private computePlan(ball: Ball) {
     const me = this.me;
-    let found: { t: number; x: number; y: number; z: number; smash: boolean } | null = null;
-    // 1º: oportunidad de remate (bola alta en mi campo)
-    if (Math.random() < this.skill.smashChance) {
-      ball.predict(3, 1 / 60, (t, x, y, z, vy) => {
-        if (x * me.side > 1.2 && x * me.side < 7.5 && vy < 0 && y > 2.0 && y < PHYS.reachUp + 0.9) {
-          found = { t, x, y, z, smash: true };
-          return true;
-        }
-        return false;
-      });
-    }
-    if (!found) {
-      ball.predict(3, 1 / 60, (t, x, y, z, vy) => {
-        if (x * me.side > 0.6 && vy < 0 && y < 1.35) {
-          found = { t, x, y, z, smash: false };
-          return true;
-        }
-        return false;
-      });
-    }
-    if (!found) return;
-    const f = found as { t: number; x: number; y: number; z: number; smash: boolean };
+    const f = planIntercept(ball, me, Math.random() < this.skill.smashChance);
+    if (!f) return;
     const err = this.skill.posError;
-    this.target.x = f.x - me.facing * 0.45 + (Math.random() - 0.5) * err;
-    this.target.z = f.z + 0.15 + (Math.random() - 0.5) * err;
-    this.target.x = me.side < 0 ? Math.min(this.target.x, -0.5) : Math.max(this.target.x, 0.5);
+    this.target.x = f.x + (Math.random() - 0.5) * err;
+    this.target.z = f.z + (Math.random() - 0.5) * err;
     this.plan = { t: f.t, smash: f.smash };
   }
+
+}
+
+export interface InterceptPlan {
+  t: number; // segundos hasta el contacto
+  x: number; z: number; // dónde debe colocarse el jugador
+  bx: number; by: number; bz: number; // dónde estará la bola
+  smash: boolean;
+}
+
+/** Predice dónde y cuándo puede golpear `me` la bola que viene (remate si va alta y se permite). */
+export function planIntercept(ball: Ball, me: Player, allowSmash: boolean): InterceptPlan | null {
+  let found: InterceptPlan | null = null;
+  const mk = (t: number, x: number, y: number, z: number, smash: boolean): InterceptPlan => {
+    let px = x - me.facing * 0.45;
+    px = me.side < 0 ? Math.min(px, -0.5) : Math.max(px, 0.5);
+    return { t, x: px, z: z + 0.15, bx: x, by: y, bz: z, smash };
+  };
+  if (allowSmash) {
+    ball.predict(3, 1 / 60, (t, x, y, z, vy) => {
+      if (x * me.side > 1.2 && x * me.side < 7.5 && vy < 0 && y > 2.1 && y < PHYS.reachUp + 1.0) { found = mk(t, x, y, z, true); return true; }
+      return false;
+    });
+  }
+  if (!found) {
+    ball.predict(3, 1 / 60, (t, x, y, z, vy) => {
+      if (x * me.side > 0.6 && vy < 0 && y < 1.3) { found = mk(t, x, y, z, false); return true; }
+      return false;
+    });
+  }
+  return found;
 }

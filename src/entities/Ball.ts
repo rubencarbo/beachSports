@@ -100,10 +100,10 @@ export class Ball {
   render() {
     const p = project(this.x, this.y, this.z);
     const g = project(this.x, 0, this.z);
-    this.sprite.setPosition(p.x, p.y).setScale(0.42 * p.k).setRotation(this.spin);
+    this.sprite.setPosition(p.x, p.y).setScale(0.74 * p.k).setRotation(this.spin);
     this.sprite.setDepth(depthFor(this.z) + 0.5);
     const hScale = Math.max(0.3, 1 - this.y * 0.08);
-    this.shadow.setPosition(g.x, g.y).setScale(0.42 * p.k * hScale, 0.5 * p.k * hScale).setAlpha(0.8 * hScale);
+    this.shadow.setPosition(g.x, g.y).setScale(0.7 * p.k * hScale, 0.75 * p.k * hScale).setAlpha(0.8 * hScale);
 
     // estela: más larga y coloreada en golpes potentes
     const sp = this.speed;
@@ -114,7 +114,7 @@ export class Ball {
     this.trailG.clear();
     if (this.trail.length > 1 && sp > 6) {
       const cols = this.kind === 'special' || this.kind === 'smash' ? TRAIL_COLORS[this.theme] : TRAIL_COLORS.normal;
-      const width = (this.kind === 'special' ? 22 : this.kind === 'smash' ? 12 : 6) * p.k;
+      const width = (this.kind === 'special' ? 30 : this.kind === 'smash' ? 17 : 9) * p.k;
       for (let i = 1; i < this.trail.length; i++) {
         const t = i / this.trail.length;
         const a = this.trail[i - 1], b = this.trail[i];

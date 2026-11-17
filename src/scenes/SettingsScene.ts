@@ -33,7 +33,7 @@ export class SettingsScene extends Phaser.Scene {
     c.add(bg);
     c.add(this.add.text(w / 2, y0 + 30, 'AJUSTES DE CONTROLES', { fontFamily: FONT, fontSize: '20px', color: '#ffd23f' }).setOrigin(0.5));
 
-    const rowH = Math.min(70, (ph - 160) / 5);
+    const rowH = Math.min(62, (ph - 150) / 7);
     let y = y0 + 80;
     const label = (t: string) => c.add(this.add.text(x0 + 30, y, t, { fontFamily: FONT, fontSize: '14px', color: '#fff' }).setOrigin(0, 0.5));
     const slider = (t: string, key: 'stickScale' | 'btnScale' | 'opacity', min: number, max: number, fmt: (v: number) => string) => {
@@ -76,6 +76,8 @@ export class SettingsScene extends Phaser.Scene {
     };
     toggle('CRUCETA', 'FLOTANTE', 'FIJA', s.stickMode === 'floating', () => updateSettings({ stickMode: 'floating' }), () => updateSettings({ stickMode: 'fixed' }));
     toggle('MANO', 'DIESTRO', 'ZURDO', !s.leftHanded, () => updateSettings({ leftHanded: false }), () => updateSettings({ leftHanded: true }));
+    toggle('MOVIMIENTO', 'ASISTIDO', 'MANUAL', s.assist, () => updateSettings({ assist: true }), () => updateSettings({ assist: false }));
+    toggle('REMATE', 'AUTOMATICO', 'CON SALTO', s.autoSmash, () => updateSettings({ autoSmash: true }), () => updateSettings({ autoSmash: false }));
 
     const by = y0 + ph - 40;
     const btn = (x: number, t: string, col: string, cb: () => void) => {

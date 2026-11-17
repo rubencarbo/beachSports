@@ -9,6 +9,8 @@ export interface Settings {
   opacity: number; // 0.15 .. 1
   stickMode: 'floating' | 'fixed';
   leftHanded: boolean;
+  assist: boolean; // movimiento asistido hacia la bola
+  autoSmash: boolean; // GOLPE con bola alta = salto + remate automático
   /** posición del centro de cada control como fracción de la pantalla (0..1) */
   pos: Record<CtrlId, { x: number; y: number }>;
 }
@@ -21,7 +23,7 @@ export const DEFAULT_POS: Settings['pos'] = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  stickScale: 1, btnScale: 1, opacity: 0.75, stickMode: 'floating', leftHanded: false,
+  stickScale: 1, btnScale: 1, opacity: 0.75, stickMode: 'floating', leftHanded: false, assist: true, autoSmash: true,
   pos: JSON.parse(JSON.stringify(DEFAULT_POS)),
 };
 

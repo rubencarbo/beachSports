@@ -70,8 +70,16 @@ def chroma_mask(n):
 
 
 def despill(n, mask):
+    """Quita el verde residual: los píxeles de borde verdosos se eliminan y el resto se neutraliza."""
     r, g, b = n[..., 0], n[..., 1], n[..., 2]
-    lim = np.maximum(r, b) + 8
+    h, w = mask.shape
+    edge = np.zeros_like(mask)
+    edge[1:, :] |= ~mask[:-1, :]; edge[:-1, :] |= ~mask[1:, :]
+    edge[:, 1:] |= ~mask[:, :-1]; edge[:, :-1] |= ~mask[:, 1:]
+    edge &= mask
+    greenish = g > np.maximum(r, b) + 6
+    mask &= ~(edge & greenish)
+    lim = np.maximum(r, b)
     n[..., 1] = np.where(mask & (g > lim), lim, g)
     return n
 

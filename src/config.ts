@@ -31,7 +31,7 @@ export const PHYS = {
   gravity: 11.5,
   playerSpeed: 7.4,
   jumpV: 6.2,
-  reach: 1.35,
+  reach: 1.6,
   reachUp: 2.45,
 };
 
