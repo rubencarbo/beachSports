@@ -1,0 +1,16 @@
+{
+  "_comment": "Hoja chibi de la jugadora naranja. Las 3 primeras cabezas se tocan: se recortan por rectángulo [x0,y0,x1,y1]. Brazo y pierna vienen enteros y se parten por codo y rodilla. La pala va suelta en el puño.",
+  "pieces": {
+    "full": [232, 364],
+    "head": [488, 30, 708, 285], "head_angry": [708, 30, 918, 285], "head_happy": [918, 30, 1128, 285],
+    "head_sad": [1228, 155],
+    "torso": [603, 402],
+    "arm": [766, 413],
+    "leg": [1125, 413],
+    "paddle": [600, 646]
+  },
+  "split": {
+    "arm": { "at": 0.5, "overlap": 0.06, "into": ["upperarm", "forearm"] },
+    "leg": { "at": 0.5, "overlap": 0.06, "into": ["thigh", "lowerleg"] }
+  }
+}

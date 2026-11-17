@@ -120,7 +120,7 @@ export class HudScene extends Phaser.Scene {
       block(fg, x - 38, 0, 76, 80, i === 0 ? UI.orange : UI.teal);
       cutRect(fg, x - 30, 8, 60, 64, 0x8fd3f5, 1, 4);
       fg.fillStyle(0xffe2a3, 1).fillRect(x - 30, 58, 60, 14);
-      const img = this.add.image(x, 74, key, 'head').setOrigin(0.5, 1).setScale(1.85).setFlipX(i === 1);
+      const img = this.add.image(x, 72, key, 'head').setOrigin(0.5, 1).setScale(1.55).setFlipX(i === 1);
       c.add([fg, img]);
       this.faces.push({ img, until: 0 });
     }
@@ -439,7 +439,8 @@ export class HudScene extends Phaser.Scene {
     const pg = this.add.graphics();
     block(pg, -290, -170, 170, 190, won ? UI.orange : UI.teal);
     cutRect(pg, -280, -160, 150, 170, 0x8fd3f5, 1, 4);
-    const head = this.add.image(-205, 4, won ? 'rig_sun' : 'rig_wave', 'head_laugh').setOrigin(0.5, 1).setScale(4.4).setFlipX(!won);
+    const hk = won ? 'rig_sun' : 'rig_wave';
+    const head = this.add.image(-205, 4, hk, this.textures.get(hk).has('head_laugh') ? 'head_laugh' : 'head_happy').setOrigin(0.5, 1).setScale(3.7).setFlipX(!won);
     const tg = this.add.graphics();
     icon(tg, 'trophy', -205, 52, 46, UI.yellow);
     p.add([pg, head, tg]);

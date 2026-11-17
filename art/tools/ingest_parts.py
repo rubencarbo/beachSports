@@ -134,7 +134,8 @@ def hair_mask(rgba):
                 continue
             hh, ll, ss = colorsys.rgb_to_hls(*(rgba[y, x, :3] / 255.0))
             hue = hh * 360
-            vivid[y, x] = ss >= 0.78 and (hue < 70 or hue > 345) and ll > 0.08
+            # pelo naranja/amarillo: tono >= 24 y no muy claro (la piel es más rojiza y más clara)
+            vivid[y, x] = ss >= 0.8 and 24 <= hue < 70 and 0.08 < ll < 0.66
     seen = np.zeros_like(vivid); keep = np.zeros_like(vivid)
     for y in range(h):
         for x in range(w):
@@ -173,7 +174,9 @@ def recolor_to_wave(rgba, part):
             if is_head:
                 if hm[y, x]:
                     new = (24 / 360, 0.08 + ll * 0.36, 0.5)  # pelo castaño oscuro
-            elif vivid and (hue < 40 or hue > 345):
+            elif part in ('upperarm', 'forearm', 'arm', 'openhand') or (part in ('lowerleg', 'leg') and y < h * 0.65):
+                continue  # piel: no se toca
+            elif vivid and (hue < 40 or hue > 345) and (part == 'paddle' or ll < 0.64):
                 if is_head:
                     new = (24 / 360, 0.08 + ll * 0.36, 0.5)  # pelo castaño oscuro
                 else:
@@ -229,7 +232,16 @@ def main():
         cfg = json.load(open(sys.argv[sys.argv.index('--map') + 1]))
         big = [c for c in comps if c['n'] > 25]
         parts = {}
-        for name, (cx, cy) in cfg['pieces'].items():
+        for name, val in cfg['pieces'].items():
+            if len(val) == 4:
+                # rectángulo explícito (px originales): para piezas que se tocan entre sí
+                x0, y0, x1, y1 = [int(round(v / p)) for v in val]
+                sub = mask[y0:y1, x0:x1]
+                ys, xs = np.nonzero(sub)
+                lab[y0:y1, x0:x1][sub] = 10000 + len(parts)
+                parts[name] = {'id': 10000 + len(parts), 'n': len(xs), 'x0': x0 + xs.min(), 'x1': x0 + xs.max(), 'y0': y0 + ys.min(), 'y1': y0 + ys.max()}
+                continue
+            cx, cy = val
             nx, ny = cx / p, cy / p
             best = min(big, key=lambda c: ((c['x0'] + c['x1']) / 2 - nx) ** 2 + ((c['y0'] + c['y1']) / 2 - ny) ** 2)
             parts[name] = best

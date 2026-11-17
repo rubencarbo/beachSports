@@ -105,8 +105,8 @@ export const ANIM = {
   blendFast: 30,
   blendNormal: 16,
   blendSlow: 10,
-  headScale: 1.45,
-  legScale: 0.74,
+  headScale: 1.0, // la hoja chibi ya trae la cabeza grande
+  legScale: 1.0,
   paddleWobble: 0.3,
 };
 
@@ -151,11 +151,15 @@ export class Rig {
       mk('torso', 'torso'),
       mk('thighF', 'thigh'), mk('lowerF', 'lowerleg'),
       mk('head', 'head'),
-      mk('upperF', 'upperarm'), mk('foreF', 'forearm'), mk('paddle', 'paddlehand'),
+      ...(this.F.paddlehand
+        ? [mk('upperF', 'upperarm'), mk('foreF', 'forearm'), mk('paddle', 'paddlehand')]
+        // sin mano con pala: la pala suelta va DETRÁS del antebrazo para que el puño tape el mango
+        : [mk('upperF', 'upperarm'), mk('paddle', 'paddle'), mk('foreF', 'forearm')]),
     ]);
+    if (!this.F.paddlehand) this.parts.paddle.setOrigin(0.5, 0.84);
     // el antebrazo con pala se recorta en la muñeca (la mano la pone la pieza de la pala)
     const fa = this.F.forearm;
-    this.parts.foreF.setCrop(0, 0, fa.w, Math.round(fa.h * 0.66));
+    if (this.F.paddlehand) this.parts.foreF.setCrop(0, 0, fa.w, Math.round(fa.h * 0.66));
     this.parts.torso.setOrigin(this.A.hip[0] / this.F.torso.w, this.A.hip[1] / this.F.torso.h);
     this.setHead('head');
   }
@@ -167,7 +171,7 @@ export class Rig {
       hip: [T.w * 0.5, T.h * 0.8] as [number, number],
       shoulder: [T.w * 0.24, T.h * 0.14] as [number, number],
       neck: [T.w * 0.56, T.h * 0.03] as [number, number],
-      wrist: this.F.forearm.h * 0.62,
+      wrist: this.F.forearm.h * (this.F.paddlehand ? 0.62 : 0.8), // sin mano de pala: centro del puño
     };
   }
 
@@ -290,7 +294,9 @@ export class Rig {
     };
     arm(Q.upperB, Q.foreB, p.armB, -1);
     const wrist = arm(Q.upperF, Q.foreF, p.armF, 1);
-    Q.paddle.setPosition(wrist.x, wrist.y).setRotation(-(p.armF[0] + p.armF[1] + p.pad));
+    const pa = p.armF[0] + p.armF[1] + p.pad;
+    if (this.F.paddlehand) Q.paddle.setPosition(wrist.x, wrist.y).setRotation(-pa);
+    else Q.paddle.setPosition(wrist.x, wrist.y).setRotation(Math.PI - pa); // la pala suelta apunta hacia arriba en la imagen
   }
 
   destroy() { this.container.destroy(); }
