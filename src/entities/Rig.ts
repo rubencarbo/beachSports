@@ -105,8 +105,8 @@ export const ANIM = {
   blendFast: 30,
   blendNormal: 16,
   blendSlow: 10,
-  headScale: 1.3,
-  legScale: 0.8,
+  headScale: 1.45,
+  legScale: 0.74,
   paddleWobble: 0.3,
 };
 
@@ -223,7 +223,7 @@ export class Rig {
     const { pose, rate, snap } = this.target(s);
     const k = snap ? 1 : 1 - Math.exp(-dt * rate);
     this.cur = lerpPose(this.cur, pose, k);
-    this.setHead(s.expr === 'happy' ? 'head_happy' : s.expr === 'effort' ? 'head_angry' : s.expr === 'sad' ? 'head_sad' : 'head');
+    this.setHead(s.expr === 'happy' ? (s.mood === 'happy' && this.F.head_laugh && Math.sin(s.time * 6) > 0 ? 'head_laugh' : 'head_happy') : s.expr === 'effort' ? 'head_angry' : s.expr === 'sad' ? 'head_sad' : 'head');
     this.layout(this.cur, dt);
   }
 
