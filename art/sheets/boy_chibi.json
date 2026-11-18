@@ -1,0 +1,15 @@
+{
+  "_comment": "Hoja chibi del chico (Toni). Misma disposición que las de las chicas.",
+  "pieces": {
+    "full": [241, 367],
+    "head": [580, 152], "head_angry": [789, 152], "head_happy": [999, 152], "head_sad": [1211, 152],
+    "torso": [597, 405],
+    "arm": [766, 413],
+    "leg": [1125, 413],
+    "paddle": [600, 646]
+  },
+  "split": {
+    "arm": { "at": 0.5, "overlap": 0.06, "into": ["upperarm", "forearm"] },
+    "leg": { "at": 0.5, "overlap": 0.06, "into": ["thigh", "lowerleg"] }
+  }
+}
