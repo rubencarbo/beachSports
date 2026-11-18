@@ -5,3 +5,5 @@
 dist
 dist-artifact
 node_modules
+trimui/build/
+trimui/test/conweb/game.js

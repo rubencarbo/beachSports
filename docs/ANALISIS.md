@@ -153,3 +153,14 @@ Comparación del mismo fotograma a 848×528:
 1. Multijugador online 1 vs 1 con Firebase Realtime Database (más baja latencia que Firestore). Modelo autoritativo del que saca, enviando solo los eventos de golpe (posición + velocidad), ya que la trayectoria es determinista.
 2. Vóley playa: `touchesPerSide: 3` y controles de recepción, colocación y remate. Futvóley: mismos toques usando el cuerpo. El escenario, la cámara, los efectos y el público se reutilizan tal cual.
 3. Arte final en sprite sheets, música, ranking global y personajes desbloqueables.
+
+## 15. Edición TrimUI Smart Pro (Knulli + jsgamelauncher)
+
+Ver `trimui/README.md`. Resumen de decisiones:
+- Phaser no corre en jsgamelauncher: la consola usa Canvas 2D a 320×180 con bucle propio, pero **la lógica de juego es la
+  misma** que la web (módulos puros extraídos: `ballPhysics`, `playerCore`, `poses`, `charData`; IA, trayectorias, torneo).
+- El decorado se hornea desde la propia web (capa a capa, sobre negro y blanco) con el etalonaje de cada sede; el público
+  sigue vivo (sprites del atlas) y las capas mantienen el paralaje real de la cámara.
+- Personajes por piezas: una `setTransform` + un `drawImage` por pieza; las piezas se reescalan al arrancar.
+- Audio: sintetizador propio con los mismos efectos y la misma música chiptune, directo a `sdl.audio`.
+- Rendimiento en el PC con el lanzador real: 0,5 ms/fotograma; el objetivo de la guía es ≤ 3 ms.

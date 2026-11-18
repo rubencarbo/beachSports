@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { playerInput } from './core/input';
-import { VIEW_H, VIEW_W } from './config';
+import { VIEW_H, VIEW_W, view } from './config';
 import { BootScene } from './scenes/BootScene';
 import { HudScene } from './scenes/HudScene';
 import { MatchScene } from './scenes/MatchScene';
@@ -40,5 +40,6 @@ document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: fal
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 (window as any).__game = game;
 (window as any).__inp = playerInput;
+(window as any).__view = view; // usado por la herramienta que hornea los decorados de la edición TrimUI
 import { getTournament } from './game/tournament';
 (window as any).__tour = getTournament;

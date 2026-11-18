@@ -1,0 +1,24 @@
+BEACH SPORTS · EDICIÓN TRIMUI SMART PRO (Knulli + jsgamelauncher)
+=================================================================
+
+INSTALAR POR RED (recomendado)
+  1. En la consola: START > Ajustes de red > activa el Wi-Fi y anota la IP. Activa SSH si está desactivado.
+  2. Desde el ordenador:   ssh root@<IP>      (contraseña: linux)
+  3. Pega el comando que aparece en la primera línea de instalar.sh (curl ... | bash).
+  4. En la consola: START > Ajustes de juegos > Actualizar listas de juegos  ->  sistema "JS Games" > Beach Sports.
+  Para actualizar el juego, repite el paso 3.
+
+INSTALAR A MANO (si jsgamelauncher ya está instalado, p. ej. por otro juego JS)
+  Copia la carpeta "beachsports" de este zip en  /userdata/roms/jsgames/  (por la SD o por red)
+  y actualiza la lista de juegos.
+
+CONTROLES
+  Cruceta / stick  mover y apuntar          A  golpear (y sacar: 2 toques, golpea en la zona verde)
+  B                saltar                   X / Y  golpe especial (barra llena)
+  Adelante + A     golpe plano / ataque     Atrás + A  globo
+  START            pausa                    MENU + START  salir del juego
+  (Si A y B te salen al revés: AJUSTES > BOTONES A / B > CAMBIADOS)
+
+SI ALGO FALLA
+  Activa AJUSTES > DIAGNÓSTICO y haz una foto de las líneas verdes (FPS, mandos, audio).
+  Registro por SSH:  tail -n 80 /userdata/system/logs/es_launch_stderr.log

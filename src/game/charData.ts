@@ -41,6 +41,16 @@ export const VARIANTS: Variant[] = [
 ];
 
 // ---------------------------------------------------------------------------------- recoloreado
+/** Registro de personajes (lo llenan la web y la consola). */
+export const roster: CharDef[] = [];
+
+export function getRoster() { return roster; }
+export function getChar(id: string | undefined): CharDef { return roster.find((c) => c.id === id) ?? roster[0]; }
+export function randomChar(except: string[] = []): CharDef {
+  const pool = roster.filter((c) => !except.includes(c.id));
+  return pool[Math.floor(Math.random() * pool.length)] ?? roster[0];
+}
+
 export function rgb2hsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255; g /= 255; b /= 255;
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b);

@@ -1,0 +1,3 @@
+{ "compilerOptions": { "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler", "strict": true, "noEmit": true, "skipLibCheck": true,
+  "resolveJsonModule": true, "esModuleInterop": true, "lib": ["ES2022", "DOM"], "types": [] },
+  "include": ["*.ts", "../../src/entities/poses.ts", "../../src/entities/ballPhysics.ts", "../../src/entities/playerCore.ts", "../../src/entities/Ai.ts", "../../src/entities/shots.ts", "../../src/game/charData.ts", "../../src/game/tournament.ts", "../../src/game/venues.ts", "../../src/config.ts", "../../src/sports/types.ts"] }

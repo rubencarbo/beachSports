@@ -3,7 +3,7 @@ import { RigData, registerRigFrames } from '../entities/Rig';
 import rigSunJson from '../assets/rig_sun.json';
 import rigWaveJson from '../assets/rig_wave.json';
 import rigBoyJson from '../assets/rig_boy.json';
-import { CharDef, STYLES, VARIANTS, recolorPixels } from './charData';
+import { CharDef, STYLES, VARIANTS, recolorPixels, roster } from './charData';
 import type { Theme } from '../entities/ballPhysics';
 export * from './charData';
 
@@ -11,15 +11,6 @@ export * from './charData';
  * Catálogo de jugadoras y jugadores. Tres hojas base (Sol, Ola, Toni) + variantes de color generadas en el
  * navegador + personajes importados por el usuario (guardados en el dispositivo).
  */
-
-const roster: CharDef[] = [];
-
-export function getRoster() { return roster; }
-export function getChar(id: string | undefined): CharDef { return roster.find((c) => c.id === id) ?? roster[0]; }
-export function randomChar(except: string[] = []): CharDef {
-  const pool = roster.filter((c) => !except.includes(c.id));
-  return pool[Math.floor(Math.random() * pool.length)] ?? roster[0];
-}
 
 function recolor(scene: Phaser.Scene, srcKey: string, dstKey: string, data: RigData, base: 'sun' | 'wave' | 'boy', hue: number) {
   const src = scene.textures.get(srcKey).getSourceImage() as HTMLImageElement;

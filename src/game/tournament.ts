@@ -1,4 +1,4 @@
-import { getChar, getRoster } from './roster';
+import { getChar, getRoster } from './charData';
 import { VENUES } from './venues';
 
 /**
