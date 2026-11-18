@@ -1,11 +1,11 @@
 {
   "name": "beach-sports",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/sw.mjs",
     "preview": "vite preview --host",
     "deploy": "npm run build && npm run build:trimui && firebase deploy --only hosting",
     "build:trimui": "node trimui/tools/build.mjs"

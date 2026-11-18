@@ -1,0 +1,42 @@
+# Publica en Firebase Hosting la web (PWA) y la carpeta /trimui/ (instalador para la consola) en cada push.
+# Configuración (una vez), en GitHub > Settings > Secrets and variables > Actions:
+#   Secret   FIREBASE_SERVICE_ACCOUNT   JSON de una cuenta de servicio con rol "Firebase Hosting Admin"
+#   Variable FIREBASE_PROJECT_ID        id del proyecto (p. ej. beachsports-1234)
+#   Variables VITE_FIREBASE_*            (opcional) config web para guardar partidas en Firestore
+name: Desplegar en Firebase
+on:
+  push:
+    branches: [main, claude/admiring-rubin-ate8ux]
+  workflow_dispatch:
+jobs:
+  deploy:
+    if: ${{ vars.FIREBASE_PROJECT_ID != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Config web de Firebase
+        run: |
+          {
+            echo "VITE_FIREBASE_API_KEY=${{ vars.VITE_FIREBASE_API_KEY }}"
+            echo "VITE_FIREBASE_AUTH_DOMAIN=${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}"
+            echo "VITE_FIREBASE_PROJECT_ID=${{ vars.VITE_FIREBASE_PROJECT_ID }}"
+            echo "VITE_FIREBASE_STORAGE_BUCKET=${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}"
+            echo "VITE_FIREBASE_MESSAGING_SENDER_ID=${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}"
+            echo "VITE_FIREBASE_APP_ID=${{ vars.VITE_FIREBASE_APP_ID }}"
+          } > .env.local
+      - run: npm run build
+      - uses: actions/cache@v4
+        with: { path: trimui/build/jsgl-deps-arm64.tar.gz, key: jsgl-deps-arm64-v1 }
+      - name: Dependencias de jsgamelauncher (arm64)
+        run: test -f trimui/build/jsgl-deps-arm64.tar.gz || bash trimui/tools/deps.sh
+      - run: npm run build:trimui
+        env: { TRIMUI_URL: "https://${{ vars.FIREBASE_PROJECT_ID }}.web.app/trimui" }
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ vars.FIREBASE_PROJECT_ID }}
+          channelId: live

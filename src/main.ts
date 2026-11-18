@@ -34,6 +34,11 @@ const game = new Phaser.Game({
 
 initBackend();
 
+// PWA: juego disponible sin conexión una vez cargado (sólo en la versión publicada)
+if (import.meta.env.PROD && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+
 // evita gestos del navegador (zoom, scroll, menú contextual) en iOS
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });

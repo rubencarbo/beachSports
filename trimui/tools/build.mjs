@@ -23,12 +23,14 @@ const first = fs.readFileSync(`${OUT}/game.js`, 'utf8').split('\n')[0];
 if (!first.startsWith('const {Math,')) throw new Error('la primera línea debe ser el alias de globales');
 // ---- distribución: instalador (con la URL del hosting), paquete de dependencias y zip para copiar a mano
 let url = process.env.TRIMUI_URL;
+if (!url) { try { const env = fs.readFileSync('.env.local', 'utf8').match(/^VITE_FIREBASE_PROJECT_ID=(\S+)/m); if (env) url = `https://${env[1]}.web.app/trimui`; } catch (e) { /* sin .env.local */ } }
 if (!url) { try { const rc = JSON.parse(fs.readFileSync('.firebaserc', 'utf8')); const id = rc.projects && rc.projects.default; if (id) url = `https://${id}.web.app/trimui`; } catch (e) { /* sin .firebaserc */ } }
 if (!url) { url = 'https://TU-PROYECTO.web.app/trimui'; console.warn('aviso: sin TRIMUI_URL ni .firebaserc; el instalador necesitará JUEGO_URL=...'); }
 fs.writeFileSync('dist/trimui/instalar.sh', fs.readFileSync('trimui/instalar.sh', 'utf8').replaceAll('__URL__', url), { mode: 0o755 });
 if (fs.existsSync('trimui/build/jsgl-deps-arm64.tar.gz')) fs.copyFileSync('trimui/build/jsgl-deps-arm64.tar.gz', 'dist/trimui/jsgl-deps-arm64.tar.gz');
 else console.warn('aviso: falta trimui/build/jsgl-deps-arm64.tar.gz (genéralo con trimui/tools/deps.sh)');
 fs.copyFileSync('trimui/LEEME.txt', 'dist/trimui/LEEME.txt');
+fs.writeFileSync('dist/trimui/index.html', fs.readFileSync('trimui/web/index.html', 'utf8').replaceAll('__URL__', url).replaceAll('__VER__', VER));
 execSync(`cd dist/trimui && rm -f beachsports-trimui.zip && python3 -c "import zipfile,os;z=zipfile.ZipFile('beachsports-trimui.zip','w',zipfile.ZIP_DEFLATED);[z.write(os.path.join(r,f)) for r,_,fs in os.walk('beachsports') for f in fs];z.write('instalar.sh');z.write('LEEME.txt');z.close()"`);
 console.log('instalador:', url + '/instalar.sh');
 // copia lista para instalar desde GitHub (raw), sin desplegar hosting: trimui/release/
