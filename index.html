@@ -16,9 +16,13 @@
     :root { --bg: #8cc8f0; --ink: #ffffff; --panel: #1d2a3a; }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e1a28; } }
     :root[data-theme="dark"] { --bg: #0e1a28; }
-    html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; overscroll-behavior: none;
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; overscroll-behavior: none;
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
-    #game { position: fixed; inset: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+    /* la caja del juego ocupa SÓLO la zona segura (sin la muesca/cámara): Phaser mide la caja entera,
+       así que no se puede usar padding (desplazaba el lienzo y lo cortaba por la derecha) */
+    :root { --safe-t: env(safe-area-inset-top, 0px); --safe-r: env(safe-area-inset-right, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); }
+    #game { position: fixed; top: var(--safe-t); right: var(--safe-r); bottom: var(--safe-b); left: var(--safe-l); overflow: hidden; }
+    #game canvas { display: block; }
     #rotate { display: none; position: fixed; inset: 0; z-index: 10; background: var(--panel); color: var(--ink);
       font-family: 'Press Start 2P', 'Courier New', monospace; font-size: 16px; line-height: 1.6; text-align: center;
       align-items: center; justify-content: center; flex-direction: column; gap: 18px; padding: 16px; }
