@@ -1,6 +1,6 @@
 import { COURT, PHYS } from '../config';
-import type { Ball } from './Ball';
-import type { Intent, Player } from './Player';
+import type { BallPhysics as Ball } from './ballPhysics';
+import type { Intent, PlayerCore as Player } from './playerCore';
 
 export interface AiSkill {
   react: [number, number]; // segundos de reacción

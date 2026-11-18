@@ -1,6 +1,6 @@
 import { COURT, PHYS } from '../config';
 import type { Side } from '../sports/types';
-import type { ShotKind } from './Ball';
+import type { ShotKind } from './ballPhysics';
 
 const FLIGHT: Record<ShotKind, number> = {
   serve: 1.35, normal: 1.25, drive: 0.9, lob: 2.1, smash: 0.55, special: 0.46,
