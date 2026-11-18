@@ -197,9 +197,9 @@ export class HudScene extends Phaser.Scene {
     const touch = this.touch;
     const foot = this.gk === 'Foot';
     const stepsFoot: { t: string; target: CtrlId | null }[] = [
-      { t: 'FUTVÓLEY: sin manos. Cada equipo tiene hasta 3 TOQUES (pie, pecho o cabeza) antes de pasar el balón. Si toca la arena, es punto.', target: null },
+      { t: 'FUTVÓLEY: sin manos (pie, pecho o cabeza). En 1 VS 1 tienes 2 TOQUES: control y pase. En 2 VS 2, 3 toques por equipo. Si toca la arena, es punto.', target: null },
       { t: touch ? 'Saque con el pie: el 1.er toque de GOLPE prepara el saque, el 2.º patea. Para la barra en la zona VERDE.' : 'Saque con el pie: la 1.ª pulsación prepara el saque, la 2.ª patea. Para la barra en la zona VERDE.', target: 'hit' },
-      { t: touch ? 'Pulsa GOLPE cuando el ANILLO se ponga verde. Toque 1 = CONTROL, toque 2 = LEVANTADA cerca de la red, toque 3 = ATAQUE.' : 'Pulsa J/ESPACIO cuando el ANILLO se ponga verde. Toque 1 = CONTROL, toque 2 = LEVANTADA, toque 3 = ATAQUE.', target: 'hit' },
+      { t: touch ? 'Pulsa GOLPE cuando el ANILLO se ponga verde: el anillo te dice si toca CONTROL, LEVANTADA o ATAQUE. En 2 VS 2 tu compañero te levantará el balón para que remates.' : 'Pulsa J/ESPACIO cuando el ANILLO se ponga verde: el anillo te dice si toca CONTROL, LEVANTADA o ATAQUE. En 2 VS 2 tu compañero te levantará el balón.', target: 'hit' },
       { t: 'Inclina la dirección hacia la red para ATACAR antes. Si la levantada va alta, harás un SHARK ATTACK en el aire. Con la barra llena, ★ = ¡chilena especial!', target: 'stick' },
     ];
     const steps: { t: string; target: CtrlId | null }[] = foot ? stepsFoot : [

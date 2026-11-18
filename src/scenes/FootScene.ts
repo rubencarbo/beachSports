@@ -97,6 +97,7 @@ export class FootScene extends Phaser.Scene {
   private touches = 0;
   private lastTeam: Side | 0 = 0;
   private lastToucher: Player | null = null;
+  private lastAction: Action | null = null;
   private rallyTouches = 0;
   private receiver: Member | null = null;
   private pressLead = 0.15;
@@ -142,7 +143,7 @@ export class FootScene extends Phaser.Scene {
     this.stage.buildNet();
     this.ball = new Ball(this);
     this.ball.netH = NET_H;
-    this.ball.size = 1.5;
+    this.ball.size = 1.15;
     this.ball.sprite.setTexture('football');
     const mk = (side: Side, id: string, human: boolean) => {
       const p = new Player(this, side, getChar(id), { noPaddle: true });
@@ -171,6 +172,24 @@ export class FootScene extends Phaser.Scene {
   }
 
   private get human(): Member | undefined { return this.all.find((m) => m.human); }
+  /** 1 vs 1: 2 toques (control y ataque). 2 vs 2: 3 toques (reglas normales). */
+  private get maxTouches() { return this.cfg.format === '1v1' ? 2 : 3; }
+
+  /** Qué hará `m` en su próximo toque (n = número de ese toque para su equipo). */
+  private decide(m: Member, n: number, forward: boolean, roll = Math.random()): Action {
+    const p = m.p;
+    if (p.powered || n >= this.maxTouches) return 'attack';
+    const setForMe = this.lastAction === 'set' && this.lastTeam === p.side && n >= 2;
+    if (m.human) return forward || setForMe ? 'attack' : n === 1 ? 'control' : 'set';
+    if (this.cfg.format === '1v1') return roll < m.skill.early ? 'attack' : 'control';
+    // compañero del usuario: casi siempre le deja el remate al usuario
+    const humanMate = this.teams[p.side].some((o) => o.human && o !== m);
+    if (humanMate && roll < 0.85) return 'set';
+    if (setForMe) return 'attack';
+    return roll < m.skill.early * (n === 2 ? 2 : 1) ? 'attack' : n === 1 ? 'control' : 'set';
+  }
+
+  private nextTouch(side: Side) { return (this.lastTeam === side ? this.touches : 0) + 1; }
   private other(side: Side): Side { return side === -1 ? 1 : -1; }
 
   // ------------------------------------------------------------------ saque
@@ -185,7 +204,7 @@ export class FootScene extends Phaser.Scene {
     this.stateT = 0;
     this.serveTimer = -1;
     this.aiServeAt = 1.1 + Math.random() * 0.5;
-    this.touches = 0; this.lastTeam = 0; this.lastToucher = null; this.rallyTouches = 0;
+    this.touches = 0; this.lastTeam = 0; this.lastToucher = null; this.rallyTouches = 0; this.lastAction = null;
     this.specialFlight = false;
     const b = this.ball;
     b.live = false; b.held = true; b.hitNet = false; b.lastHitter = 0; b.kind = 'normal';
@@ -452,8 +471,10 @@ export class FootScene extends Phaser.Scene {
   }
 
   private wantsHigh(m: Member): boolean {
-    const n = this.lastTeam === m.p.side ? this.touches : 0;
-    return n >= 2 && (m.human ? getSettings().autoSmash : Math.random() < m.skill.shark);
+    const n = this.nextTouch(m.p.side);
+    const attackNext = n >= this.maxTouches || (this.lastAction === 'set' && this.lastTeam === m.p.side);
+    if (m.human && this.decide(m, n, false) !== 'attack') return false;
+    return attackNext && (m.human ? getSettings().autoSmash : Math.random() < m.skill.shark);
   }
 
   // ------------------------------------------------------------------ máquina
@@ -521,7 +542,7 @@ export class FootScene extends Phaser.Scene {
     this.lastToucher = p;
     p.hitBuffer = 0;
     if (m.human) this.humanPressed = false;
-    if (this.touches > 3) { this.pointWon(this.other(p.side), 'touches'); return; }
+    if (this.touches > this.maxTouches) { this.pointWon(this.other(p.side), 'touches'); return; }
 
     // calidad: momento de pulsar (humano) o habilidad (máquina)
     let q: number;
@@ -535,11 +556,8 @@ export class FootScene extends Phaser.Scene {
     // qué hacer
     const team = this.teams[p.side];
     const mate = team.find((o) => o !== m);
-    let action: Action;
-    if (this.touches >= 3) action = 'attack';
-    else if (m.human) action = playerInput.mx * p.facing > 0.45 ? 'attack' : this.touches === 1 ? 'control' : 'set';
-    else action = Math.random() < m.skill.early * (this.touches === 2 ? 2 : 1) ? 'attack' : this.touches === 1 ? 'control' : 'set';
-    if (p.powered) action = 'attack';
+    const action = this.decide(m, this.touches, playerInput.mx * p.facing > 0.45);
+    this.lastAction = action;
 
     const part: Part = p.airborne && yRel > 1.3 ? (action === 'attack' ? 'shark' : 'head') : yRel > 1.45 ? 'head' : yRel > 0.85 ? 'chest' : 'kick';
     p.contact(part, part === 'shark' || action === 'attack');
@@ -549,13 +567,14 @@ export class FootScene extends Phaser.Scene {
       // control: el balón sube para el siguiente toque; levantada: alto junto a la red
       let tx: number, tz: number;
       if (action === 'control') {
-        if (mate) { tx = mate.p.x; tz = mate.p.z; } else { tx = p.side * 3.4; tz = Phaser.Math.Clamp(p.z, 1, 7); }
+        // 2 vs 2: al compañero; 1 vs 1: se la deja a sí mismo a media pista para atacar en el 2.º toque
+        if (mate) { tx = mate.p.x; tz = mate.p.z; } else { tx = p.side * 2.6; tz = Phaser.Math.Clamp(p.z, 1, 7); }
       } else {
         const atk = mate ?? m;
         tx = p.side * 1.7; tz = Phaser.Math.Clamp(atk.p.z, 1.2, 6.8);
       }
       const T = action === 'control' ? 1.05 : 1.15;
-      this.shoot(b, p, tx, tz, action === 'set' ? 2.2 : 1.1, T, Math.min(1, q + 0.2), 'normal');
+      this.shoot(b, p, tx, tz, action === 'set' ? 2.2 : mate ? 1.1 : 1.5, T, Math.min(1, q + 0.2), 'normal');
       sfx.hit(0.25);
       this.fx.hitSpark(bp0.x, bp0.y, false);
       if (m.human && q > 0.85) { this.fx.floatText(bp0.x, bp0.y - 70, action === 'control' ? '¡BUEN CONTROL!' : '¡GRAN LEVANTADA!', '#ffe14d', 26); this.stats.perfects++; }
@@ -673,7 +692,7 @@ export class FootScene extends Phaser.Scene {
     sfx.whistle();
     sfx.cheer(reason === 'unstoppable' ? 1.4 : 0.8);
     this.stage.cheer(reason === 'unstoppable' ? 1 : 0.6);
-    const labels = { in: '¡PUNTO!', out: '¡FUERA!', 'own-side': '¡AL SUELO!', unstoppable: '¡IMPARABLE!', touches: '¡4 TOQUES!' };
+    const labels = { in: '¡PUNTO!', out: '¡FUERA!', 'own-side': '¡AL SUELO!', unstoppable: '¡IMPARABLE!', touches: `¡${this.maxTouches + 1} TOQUES!` };
     const bp = this.ball.screenPos();
     this.fx.floatText(bp.x, Math.min(bp.y, 520) - 60, labels[reason], reason === 'in' || reason === 'unstoppable' ? '#ffe14d' : '#ffffff', 40);
     const w = this.teams[winner][0].p;
@@ -744,14 +763,15 @@ export class FootScene extends Phaser.Scene {
     if (!hum || !plan || this.cfg.mode !== 'play' || this.state !== 'rally') { this.ringLabel.setVisible(false); return; }
     const c = project(plan.bx, 0, plan.bz);
     const perfect = Math.abs(plan.t - 0.15) < 0.09;
-    const n = this.lastTeam === hum.p.side ? this.touches : 0;
-    const attack = n >= 2 || hum.p.powered || playerInput.mx * hum.p.facing > 0.45;
+    const n = this.nextTouch(hum.p.side) - 1;
+    const act = this.decide(hum, n + 1, playerInput.mx * hum.p.facing > 0.45);
+    const attack = act === 'attack';
     const col = plan.high ? 0xff8a1f : perfect ? 0x4dff6a : 0xffffff;
     const r = (30 + Math.min(1.2, plan.t) * 90) * c.k;
     g.lineStyle(4 * c.k, col, 0.9).strokeEllipse(c.x, c.y, r * 2, r * 0.7);
     g.lineStyle(3 * c.k, col, 0.6).strokeEllipse(c.x, c.y, 30 * c.k * 2, 30 * c.k * 0.7);
     g.fillStyle(col, perfect ? 0.35 : 0.15).fillEllipse(c.x, c.y, 30 * c.k * 2, 30 * c.k * 0.7);
-    const txt = attack ? (plan.high ? 'SHARK ATTACK' : 'ATAQUE') : n === 0 ? 'CONTROL' : 'LEVANTADA';
+    const txt = attack ? (plan.high ? 'SHARK ATTACK' : 'ATAQUE') : act === 'control' ? 'CONTROL' : 'LEVANTADA';
     this.ringLabel.setText(`${n + 1}.º · ${txt}`).setPosition(c.x, c.y - 40 * c.k).setScale(c.k).setVisible(true);
   }
 
