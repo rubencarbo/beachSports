@@ -10,8 +10,8 @@ import { PIXEL_FONT } from '../core/fonts';
  * público animado (balanceo, brazos arriba, carteles) y siluetas en primer plano.
  */
 
-interface Layer { c: Phaser.GameObjects.Container; sx: number; sy: number; pinBottom?: boolean }
-interface Fan { s: Phaser.GameObjects.Sprite; baseY: number; phase: number; sign: boolean; amp: number; up: number }
+interface Layer { c: Phaser.GameObjects.Container; sx: number; sy: number; pinBottom?: boolean; screen?: boolean }
+interface Fan { s: Phaser.GameObjects.Sprite; baseY: number; phase: number; sign: boolean; amp: number; up: number; keyA?: string; keyB?: string }
 
 export class BeachStage {
   layers: Layer[] = [];
@@ -23,6 +23,8 @@ export class BeachStage {
   private palms: Phaser.GameObjects.Image[] = [];
   private rays!: Phaser.GameObjects.Image;
   excitement = 0; // 0..1
+  private frondL!: Phaser.GameObjects.Image;
+  private frondR!: Phaser.GameObjects.Image;
   private courtG!: Phaser.GameObjects.Graphics;
   private netG!: Phaser.GameObjects.Graphics;
   boardTexts: Phaser.GameObjects.Text[] = [];
@@ -87,6 +89,15 @@ export class BeachStage {
       gl.add(g);
     }
 
+    // bruma sobre el horizonte: separa fondo y primer plano (perspectiva atmosférica)
+    const haze = this.layer(0.45, 0.6, 5);
+    const hz = s.add.graphics();
+    hz.fillGradientStyle(0xeaf7ff, 0xeaf7ff, 0xeaf7ff, 0xeaf7ff, 0, 0, 0.32, 0.32);
+    hz.fillRect(STAGE_CX - 3000, HORIZON_Y - 160, 6000, 160);
+    hz.fillGradientStyle(0xeaf7ff, 0xeaf7ff, 0xfff1d6, 0xfff1d6, 0.32, 0.32, 0.1, 0.1);
+    hz.fillRect(STAGE_CX - 3000, HORIZON_Y, 6000, 120);
+    haze.add(hz);
+
     // farolas
     const back = this.layer(0.64, 0.85, 6);
     for (const px of [-11.5, 11.5]) {
@@ -123,18 +134,17 @@ export class BeachStage {
     // público tras la valla del fondo
     const crowd = this.layer(0.69, 0.95, 8);
     const rows = [
-      { z: COURT.fenceZ + 1.9, sc: 0.78, n: 36 },
-      { z: COURT.fenceZ + 1.2, sc: 0.84, n: 34 },
-      { z: COURT.fenceZ + 0.55, sc: 0.9, n: 30 },
+      { z: COURT.fenceZ + 1.7, sc: 1.0, n: 24 },
+      { z: COURT.fenceZ + 0.6, sc: 1.0, n: 20 },
     ];
     for (const r of rows) {
       for (let i = 0; i < r.n; i++) {
-        const wx = -15 + (30 * i) / r.n + (Math.random() - 0.5) * 0.4;
+        const wx = -15 + (30 * i) / r.n + (Math.random() - 0.5) * 0.6 + (r.n === 20 ? 0.6 : 0);
         // hueco para el marcador detrás de la red
         if (r.z < COURT.fenceZ + 0.8 && wx > 0.6 && wx < 3.4) continue;
         const p = project(wx, 0, r.z);
         const idx = Math.floor(Math.random() * FAN_VARIANTS);
-        const im = s.add.sprite(p.x, p.y, `fan${idx}`, 'a').setOrigin(0.5, 0.97).setScale(ART_SCALE * p.k * 1.25 * (0.92 + Math.random() * 0.16));
+        const im = s.add.sprite(p.x, p.y, `fan${idx}`, 'a').setOrigin(0.5, 0.97).setScale(ART_SCALE * p.k * 1.6 * r.sc * (0.9 + Math.random() * 0.18));
         if (Math.random() < 0.5) im.setFlipX(true);
         crowd.add(im);
         this.fans.push({ s: im, baseY: p.y, phase: Math.random() * 10, sign: idx % 4 === 0, amp: 1 + Math.random() * 2, up: 0 });
@@ -162,25 +172,28 @@ export class BeachStage {
     this.buildCourt(court);
 
     // primer plano: hojas de palmera en las esquinas y siluetas del público
-    const fronds = this.layer(1.12, 1.05, 500);
-    const fl = s.add.image(STAGE_CX - 1050, -40, 'fronds').setOrigin(0.5, 0).setScale(1.4);
-    const fr = s.add.image(STAGE_CX + 1050, -60, 'fronds').setOrigin(0.5, 0).setScale(-1.4, 1.4);
-    this.palms.push(fl, fr);
-    fronds.add([fl, fr]);
+    const fronds = this.layer(1, 1, 500);
+    this.layers[this.layers.length - 1].screen = true; // en coordenadas de pantalla: siempre en las esquinas
+    this.frondL = s.add.image(0, 0, 'fronds').setOrigin(0.5, 0.05).setScale(1.05);
+    this.frondR = s.add.image(0, 0, 'fronds').setOrigin(0.5, 0.05).setScale(-1.05, 1.05);
+    this.palms.push(this.frondL, this.frondR);
+    fronds.add([this.frondL, this.frondR]);
 
     const fgL = this.layer(1.28, 1.08, 600);
     this.layers[this.layers.length - 1].pinBottom = true; // siempre pegadas al borde inferior de la pantalla
-    for (let i = 0; i < 30; i++) {
-      const v = Math.floor(Math.random() * 6);
-      const x = STAGE_CX - 1700 + i * 118 + Math.random() * 40;
-      const y = 802 + Math.random() * 25;
-      const im = s.add.sprite(x, y, `sil${v}`, 'a').setOrigin(0.5, 1).setScale(1.9 + Math.random() * 0.45);
-      fgL.add(im);
-      this.fg.push({ s: im, baseY: y, phase: Math.random() * 10, sign: false, amp: 2 + Math.random() * 3, up: 0 });
+    for (const row of [{ y: 832, sc: 0.4, n: 38, dx: 0 }, { y: 884, sc: 0.5, n: 28, dx: 60 }]) {
+      for (let i = 0; i < row.n; i++) {
+        const v = Math.floor(Math.random() * 7);
+        const x = STAGE_CX - 1900 + row.dx + i * (3800 / row.n) + (Math.random() - 0.5) * 40;
+        const y = row.y + Math.random() * 18;
+        const im = s.add.sprite(x, y, `silS${v}a`).setOrigin(0.5, 0.75).setScale(row.sc * (0.9 + Math.random() * 0.2)).setFlipX(Math.random() < 0.5);
+        fgL.add(im);
+        this.fg.push({ s: im, baseY: y, phase: Math.random() * 10, sign: false, amp: 2 + Math.random() * 3, up: 0, keyA: `silS${v}a`, keyB: `silS${v}b` });
+      }
     }
     // banda de arena/sombra inferior para tapar el borde
     const band = s.add.graphics();
-    band.fillStyle(0x161c28, 1).fillRect(STAGE_CX - 2400, 795, 4800, 300);
+    band.fillStyle(0x121722, 1).fillRect(STAGE_CX - 2400, 860, 4800, 300);
     fgL.addAt(band, 0);
   }
 
@@ -217,12 +230,16 @@ export class BeachStage {
       for (let i = 0; i < n; i++) {
         const x = x0 + i * step;
         const a = P(x, 0, fz), b = P(x + step, 0, fz), at = P(x, 2.1, fz), bt = P(x + step, 2.1, fz);
-        g.fillStyle(0xbfe6f5, 0.14);
+        g.fillStyle(0xbfe6f5, 0.2);
         g.fillPoints([at, bt, b, a].map((p) => new Phaser.Math.Vector2(p.x, p.y)), true);
-        g.lineStyle(3, 0xffffff, 0.25);
+        const am = P(x, 0.6, fz), bm = P(x + step, 0.6, fz);
+        g.fillStyle(0xffffff, 0.1).fillPoints([am, bm, b, a].map((p) => new Phaser.Math.Vector2(p.x, p.y)), true);
+        g.lineStyle(4, 0xffffff, 0.3);
         g.lineBetween(at.x + 16, at.y + 8, at.x + 50, a.y - 6);
+        g.lineStyle(2, 0xffffff, 0.22);
+        g.lineBetween(at.x + 34, at.y + 8, at.x + 62, at.y + 44);
       }
-      g.lineStyle(1, 0x404a56, 0.35);
+      g.lineStyle(1.5, 0x2b3038, 0.5);
       for (let x = x0; x <= x1 + 0.01; x += 0.45) {
         const a = P(x, 2.1, fz), b = P(x, mt, fz);
         g.lineBetween(a.x, a.y, b.x, b.y);
@@ -231,15 +248,17 @@ export class BeachStage {
         const a = P(x0, y, fz), b = P(x1, y, fz);
         g.lineBetween(a.x, a.y, b.x, b.y);
       }
-      g.lineStyle(5, 0x2b3038, 1);
-      for (let i = 0; i <= n; i++) {
-        const x = x0 + i * step;
-        const a = P(x, 0, fz), b = P(x, mt, fz);
-        g.lineBetween(a.x, a.y, b.x, b.y);
-      }
-      for (const y of [2.1, mt]) {
-        const a = P(x0, y, fz), b = P(x1, y, fz);
-        g.lineBetween(a.x, a.y, b.x, b.y);
+      for (const [wdt, col, off] of [[8, 0x2b3038, 0], [2, 0xb4bfce, -2]] as [number, number, number][]) {
+        g.lineStyle(wdt, col, 1);
+        for (let i = 0; i <= n; i++) {
+          const x = x0 + i * step;
+          const a = P(x, 0, fz), b = P(x, mt, fz);
+          g.lineBetween(a.x + off, a.y, b.x + off, b.y);
+        }
+        for (const y of [2.1, mt]) {
+          const a = P(x0, y, fz), b = P(x1, y, fz);
+          g.lineBetween(a.x, a.y + off, b.x, b.y + off);
+        }
       }
     }
     // valla baja de madera/lona en el centro abierto
@@ -288,6 +307,12 @@ export class BeachStage {
       side.lineBetween(c0.x, c0.y, c1.x, c1.y);
     }
 
+    // sombra de la red sobre la arena
+    {
+      const z0 = -0.4, z1 = COURT.width + 0.4;
+      const pts = [P(0, 0, z1), P(0, 0, z0), P(0.9, 0, z0 - 0.5), P(0.9, 0, z1 - 0.5)];
+      g.fillStyle(0x6a4a20, 0.16).fillPoints(pts.map((p) => new Phaser.Math.Vector2(p.x, p.y)), true);
+    }
     // líneas de la pista (cinta azul)
     const lines = g;
     const L = COURT.halfLen, W = COURT.width;
@@ -314,21 +339,30 @@ export class BeachStage {
     const g = this.netG;
     g.clear();
     const z0 = -0.4, z1 = COURT.width + 0.4, h = COURT.netH;
-    g.lineStyle(1, 0x1c1c1c, 0.5);
-    for (let z = z0; z <= z1; z += 0.2) {
-      const a = P(0, 0.05, z), b = P(0, h, z);
+    g.lineStyle(1.4, 0x15181f, 0.62);
+    for (let z = z0; z <= z1; z += 0.18) {
+      const a = P(0, 0.08, z), b = P(0, h - 0.06, z);
       g.lineBetween(a.x, a.y, b.x, b.y);
     }
-    for (let y = 0.05; y <= h; y += 0.14) {
+    for (let y = 0.08; y <= h - 0.05; y += 0.13) {
       const a = P(0, y, z0), b = P(0, y, z1);
       g.lineBetween(a.x, a.y, b.x, b.y);
     }
     const t0 = P(0, h, z0), t1 = P(0, h, z1);
-    g.lineStyle(5, 0xffffff, 1).lineBetween(t0.x, t0.y, t1.x, t1.y);
+    g.lineStyle(9, 0x1b2240, 1).lineBetween(t0.x, t0.y + 1, t1.x, t1.y + 1);
+    g.lineStyle(6, 0xffffff, 1).lineBetween(t0.x, t0.y, t1.x, t1.y);
     for (const z of [z0, z1]) {
-      const a = P(0, 0, z), b = P(0, h + 0.15, z);
-      g.lineStyle(7, 0x2b3038, 1).lineBetween(a.x, a.y, b.x, b.y);
+      const a = P(0, 0, z), b = P(0, h + 0.18, z);
+      g.lineStyle(11, 0x1b2240, 1).lineBetween(a.x, a.y, b.x, b.y);
+      g.lineStyle(5, 0x5a6478, 1).lineBetween(a.x - 2, a.y, b.x - 2, b.y);
+      g.fillStyle(0xffffff, 1).fillCircle(b.x, b.y, 6 * a.k);
     }
+  }
+
+  /** Posición del sol en el mundo (para el resplandor del etalonaje). */
+  sunWorld() {
+    const m = this.rays.getWorldTransformMatrix();
+    return { x: m.tx, y: m.ty };
   }
 
   setScore(a: number, b: number) {
@@ -337,9 +371,9 @@ export class BeachStage {
   }
 
   /** El público reacciona: 1 = locura (especial / punto). */
-  cheer(amount: number) {
+  cheer(amount: number, foreground = true) {
     this.excitement = Math.min(1, Math.max(this.excitement, amount));
-    for (const f of [...this.fans, ...this.fg]) if (Math.random() < amount * 0.85) f.up = 0.8 + Math.random() * 1.6 * amount;
+    for (const f of foreground ? [...this.fans, ...this.fg] : this.fans) if (Math.random() < amount * 0.85) f.up = 0.8 + Math.random() * 1.6 * amount;
   }
 
   /** Aplica el parallax real a cada capa según la cámara. */
@@ -350,6 +384,14 @@ export class BeachStage {
       const tx = camX - c * (STAGE_CX + l.sx * (camX - STAGE_CX));
       let ty = camY - c * (CAM_BASE_Y + l.sy * (camY - CAM_BASE_Y));
       if (l.pinBottom) ty = camY + halfH + 30 / zoom - c * 800 + Math.sin(this.scene.time.now * 0.0007) * 3;
+      if (l.screen) {
+        // tamaño constante en pantalla, anclado a la esquina superior de la vista
+        const W = this.scene.cameras.main.width;
+        l.c.setPosition(camX, camY - halfH).setScale(1 / zoom);
+        this.frondL.setPosition(-W / 2 + 30, -40);
+        this.frondR.setPosition(W / 2 - 30, -50);
+        continue;
+      }
       l.c.setPosition(tx, ty).setScale(c);
     }
   }
@@ -379,7 +421,7 @@ export class BeachStage {
         if (f.up > 0) f.up -= dt;
         const up = f.up > 0;
         const isSil = group === this.fg;
-        if (isSil) f.s.setFrame(up ? 'b' : 'a');
+        if (isSil) f.s.setTexture(up ? f.keyB! : f.keyA!);
         else f.s.setFrame(up ? (f.sign ? 'd' : Math.sin(t * 9 + f.phase) > 0 ? 'b' : 'c') : 'a');
         const jump = up ? Math.abs(Math.sin(t * 9 + f.phase)) * 10 * f.amp * 0.6 : 0;
         // movimiento a saltos de 1 px de arte

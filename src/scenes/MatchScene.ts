@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
-import { COURT, PHYS, PPM, RETRO_ROWS, VIEW_W, project, view } from '../config';
-import { applyRetro } from '../fx/RetroPipeline';
+import { COURT, PHYS, PPM, VIEW_H, VIEW_W, project, view } from '../config';
+import { GradePipeline } from '../fx/RetroPipeline';
 import { sfx } from '../core/audio';
 import { playerInput } from '../core/input';
 import { AI_LEVELS, AiController, InterceptPlan, planIntercept } from '../entities/Ai';
 import { getSettings } from '../core/settings';
 import { Ball, ShotKind } from '../entities/Ball';
 import { Intent, Player } from '../entities/Player';
-import { computeShot } from '../entities/shots';
+import { DEPTH, computeShot } from '../entities/shots';
 import { CAM_BASE_Y, CameraDirector } from '../fx/CameraDirector';
 import { Effects } from '../fx/Effects';
 import { saveMatch } from '../services/backend';
@@ -74,7 +74,10 @@ export class MatchScene extends Phaser.Scene {
     this.fx = new Effects(this);
     this.dir = new CameraDirector(this.cameras.main);
     this.cameras.main.setBackgroundColor('#5c8ad1');
-    applyRetro(this.cameras.main, RETRO_ROWS);
+    if (this.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer) {
+      this.cameras.main.setPostPipeline(GradePipeline);
+      this.grade = this.cameras.main.getPostPipeline(GradePipeline) as GradePipeline;
+    }
     this.stage.setScore(0, 0);
     this.setupServe(Math.random() < 0.5 ? -1 : 1);
     playerInput.reset();
@@ -83,7 +86,14 @@ export class MatchScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ flujo
+  private matchPoint(): boolean {
+    const a = this.score[-1], b = this.score[1], n = this.rules.pointsToWin;
+    return (a >= n - 1 && a > b) || (b >= n - 1 && b > a);
+  }
+
   private setupServe(server: Side) {
+    this.game.events.emit('rally', 0);
+    if (this.cfg.mode === 'play' && this.matchPoint()) this.time.delayedCall(300, () => this.game.events.emit('banner', '¡PUNTO DE PARTIDO!'));
     this.server = server;
     this.state = 'serve';
     this.stateT = 0;
@@ -136,7 +146,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ cámara
-  private baseZoom() { return (this.cameras.main.width / VIEW_W) * 1.32; }
+  private baseZoom() { const c = this.cameras.main; return Math.max(c.width / VIEW_W, c.height / VIEW_H) * 1.4; }
 
   private updateCameraTargets() {
     const d = this.dir;
@@ -164,7 +174,7 @@ export class MatchScene extends Phaser.Scene {
     // la cámara "levanta la vista" con los globos
     d.followY = CAM_BASE_Y + Math.min(0, bp.y - 330) * 0.5;
     const high = Phaser.Math.Clamp((b.y - 3) / 5, 0, 1);
-    d.followZoom = bz * (1.02 - high * 0.12);
+    d.followZoom = bz * (1.02 - high * 0.07);
     d.panTime = this.specialFlight ? 0.16 : b.kind === 'smash' || b.kind === 'drive' ? 0.38 : 0.55;
     d.zoomTime = 0.7;
     if (this.specialFlight) d.followZoom = bz * 1.07;
@@ -277,6 +287,14 @@ export class MatchScene extends Phaser.Scene {
     const cam = this.dir.update(realDt, this.now);
     view.vpx = cam.x;
     this.stage.applyParallax(cam.x, cam.y, cam.zoom);
+    if (this.grade) {
+      const sw = this.stage.sunWorld();
+      const c = this.cameras.main;
+      const sx = (sw.x - c.midPoint.x) * c.zoom + c.width / 2, sy = (sw.y - c.midPoint.y) * c.zoom + c.height / 2;
+      this.grade.sun = [sx / c.width, 1 - sy / c.height];
+      this.grade.flash = Math.max(0, this.grade.flash - realDt * 3);
+    }
+    this.footprints();
     this.stage.drawCourt();
     this.stage.drawNet();
     this.stage.update(realDt, time);
@@ -323,6 +341,24 @@ export class MatchScene extends Phaser.Scene {
     this.fx.hitSpark(bp.x, bp.y);
   }
 
+  private grade?: GradePipeline;
+  private stepIdx: Record<number, number> = {};
+
+  /** Huellas en la arena al correr (se desvanecen poco a poco). */
+  private footprints() {
+    for (const p of [this.p1, this.p2]) {
+      const step = Math.floor(p.runPhase / Math.PI);
+      if (this.stepIdx[p.side] === undefined) this.stepIdx[p.side] = step;
+      if (step !== this.stepIdx[p.side]) {
+        this.stepIdx[p.side] = step;
+        if (!p.airborne && Math.hypot(p.vx, p.vz) > 1.5) {
+          const g = project(p.x - p.facing * 0.1, 0, p.z + (step % 2 ? 0.12 : -0.12));
+          this.fx.decal('footprint', g.x, g.y, g.k * 1.3, p.facing < 0);
+        }
+      }
+    }
+  }
+
   private humanPlan: InterceptPlan | null = null;
   private smashQueued = false;
   private pressLead = 0.12;
@@ -337,7 +373,9 @@ export class MatchScene extends Phaser.Scene {
     const b = this.ball;
     const st = getSettings();
     this.humanPlan = this.state === 'rally' && b.live && !b.held && b.lastHitter !== p.side ? planIntercept(b, p, st.autoSmash) : null;
-    if (st.assist && this.state === 'rally' && Math.hypot(it.mx, it.mz) < 0.55) {
+    // asistido: mientras viene la bola la cruceta SÓLO apunta (la jugadora va sola al punto de golpeo);
+    // con la bola alejándose, la cruceta mueve libremente y, si no se toca, vuelve a su posición
+    if (st.assist && this.state === 'rally' && (this.humanPlan || Math.hypot(it.mx, it.mz) < 0.55)) {
       const tgt = this.humanPlan ?? { x: p.side * 5.2, z: 4 + (b.z - 4) * 0.35 };
       const dx = tgt.x - p.x, dz = tgt.z - p.z;
       const dist = Math.hypot(dx, dz);
@@ -367,6 +405,18 @@ export class MatchScene extends Phaser.Scene {
   }
   private autoOver = false;
 
+  /** Tiro del jugador según la cruceta: hacia la red = plano, hacia atrás = globo; arriba/abajo = profundidad.
+   *  Sin dirección: apunta lejos del rival (decisión sensata por defecto). */
+  private humanAim(p: Player): { kind: ShotKind; aimZ: number } {
+    const fwd = playerInput.mx * p.facing;
+    const kind: ShotKind = fwd > 0.45 ? 'drive' : fwd < -0.45 ? 'lob' : 'normal';
+    const opp = p === this.p1 ? this.p2 : this.p1;
+    const aimZ = Math.abs(playerInput.my) > 0.3 ? (playerInput.my + 1) / 2 : opp.z > COURT.width / 2 ? 0.15 : 0.85;
+    return { kind, aimZ };
+  }
+
+  private aimLabel?: Phaser.GameObjects.Text;
+
   /** Anillo de golpeo en la arena: se cierra hasta el contacto y se pone verde en el momento perfecto. */
   private drawRing() {
     if (!this.ring) this.ring = this.add.graphics().setDepth(97);
@@ -374,7 +424,7 @@ export class MatchScene extends Phaser.Scene {
     g.clear();
     const plan = this.humanPlan;
     const human = this.ai.has(-1) ? null : this.p1;
-    if (!plan || !human || this.cfg.mode !== 'play') return;
+    if (!plan || !human || this.cfg.mode !== 'play') { this.aimLabel?.setVisible(false); return; }
     const c = project(plan.bx, 0, plan.bz);
     const perfect = Math.abs(plan.t - 0.12) < 0.08;
     const col = plan.smash ? 0xff8a1f : perfect ? 0x4dff6a : 0xffffff;
@@ -382,6 +432,22 @@ export class MatchScene extends Phaser.Scene {
     g.lineStyle(4 * c.k, col, 0.9).strokeEllipse(c.x, c.y, r * 2, r * 0.7);
     g.lineStyle(3 * c.k, col, 0.6).strokeEllipse(c.x, c.y, 26 * c.k * 2, 26 * c.k * 0.7);
     g.fillStyle(col, perfect ? 0.35 : 0.15).fillEllipse(c.x, c.y, 26 * c.k * 2, 26 * c.k * 0.7);
+
+    // diana en el campo rival: dónde irá tu golpe con la dirección actual de la cruceta
+    const aim = plan.smash ? { kind: 'smash' as ShotKind, aimZ: this.humanAim(human).aimZ } : this.humanAim(human);
+    if (human.powered) aim.kind = 'special';
+    const [d0, d1] = DEPTH[aim.kind];
+    const tx = -human.side * (d0 + d1) / 2, tz = 0.7 + aim.aimZ * (COURT.width - 1.4);
+    const tp = project(tx, 0, tz);
+    const pulse = 1 + Math.sin(this.now * 10) * 0.08;
+    const tc = aim.kind === 'lob' ? 0x5fd0ff : aim.kind === 'drive' ? 0xff5a3a : aim.kind === 'smash' || aim.kind === 'special' ? 0xffb020 : 0xffffff;
+    const R = 30 * tp.k * pulse;
+    g.lineStyle(4 * tp.k, 0x1b2240, 0.5).strokeEllipse(tp.x + 2, tp.y + 2, R * 2, R * 0.7);
+    g.lineStyle(4 * tp.k, tc, 0.95).strokeEllipse(tp.x, tp.y, R * 2, R * 0.7);
+    g.lineStyle(3 * tp.k, tc, 0.95).lineBetween(tp.x - R * 1.25, tp.y, tp.x - R * 0.55, tp.y).lineBetween(tp.x + R * 0.55, tp.y, tp.x + R * 1.25, tp.y);
+    if (!this.aimLabel) this.aimLabel = this.add.text(0, 0, '', { fontFamily: '"Pixelify Sans", monospace', fontStyle: 'bold', fontSize: '18px', color: '#fff3d6', stroke: '#1b2240', strokeThickness: 5 }).setOrigin(0.5).setDepth(98);
+    const names: Record<string, string> = { normal: 'NORMAL', drive: 'PLANO', lob: 'GLOBO', smash: 'REMATE', special: 'ESPECIAL', serve: '' };
+    this.aimLabel.setText(names[aim.kind]).setPosition(tp.x, tp.y - R * 0.9 - 12).setScale(tp.k).setVisible(true);
   }
 
   private activateSpecial(p: Player) {
@@ -444,8 +510,7 @@ export class MatchScene extends Phaser.Scene {
     if (ai) { kind = ai.wantShot.kind; aimZ = ai.wantShot.aimZ; }
     else if (it) {
       const fwd = it.mx * p.facing;
-      kind = fwd > 0.45 ? 'drive' : fwd < -0.45 ? 'lob' : 'normal';
-      aimZ = Math.abs(it.mz) > 0.3 ? (it.mz + 1) / 2 : 0.2 + Math.random() * 0.6;
+      ({ kind, aimZ } = this.humanAim(p));
     }
     if (p.airborne && b.y > 1.9) kind = 'smash';
     const special = p.powered;
@@ -454,6 +519,13 @@ export class MatchScene extends Phaser.Scene {
     const v = computeShot({ x: b.x, y: b.y, z: b.z }, p.side, kind, aimZ, special ? 1 : q);
     b.launch(v.vx, v.vy, v.vz, p.side, kind, p.theme);
     this.rallyHits++;
+    if (this.rallyHits >= 4) {
+      // peloteo largo: el público se anima cada vez más y la barra del especial se carga más deprisa
+      this.stage.cheer(Math.min(0.75, 0.15 + this.rallyHits * 0.04), false);
+      p.meter = Math.min(1, p.meter + Math.min(0.1, (this.rallyHits - 3) * 0.015));
+      if (this.rallyHits % 2 === 0) sfx.cheer(Math.min(1, 0.3 + this.rallyHits * 0.05));
+    }
+    this.game.events.emit('rally', this.rallyHits);
     const over = kind === 'smash' || (special && p.airborne);
     p.contact(over ? 'over' : 'fore', kind === 'smash' || special);
     { const sp = project(p.x, p.y + 1.1, p.z); this.fx.swoosh(sp.x, sp.y, p.facing, over, sp.k, special ? p.theme : null); }
@@ -507,6 +579,7 @@ export class MatchScene extends Phaser.Scene {
     if (ev.type === 'fence') { sfx.bounce(); if (this.state === 'rally') this.resolve(b.lastHitter === -1 ? 1 : -1, 'out'); return; }
     // suelo
     const g = project(ev.x, 0, ev.z);
+    this.fx.decal('ballmark', g.x, g.y, g.k * 1.2, false);
     if (this.state !== 'rally') { this.fx.sandPuff(g.x, g.y, 5); return; }
     const inCourt = Math.abs(ev.x) <= COURT.halfLen + 0.05 && ev.z >= -0.05 && ev.z <= COURT.width + 0.05;
     const landedSide: Side = ev.x < 0 ? -1 : 1;
@@ -518,6 +591,7 @@ export class MatchScene extends Phaser.Scene {
       this.dir.shake(420, 0.014);
       this.dir.kick(0.07);
       this.dir.flash(160, 255, 240, 200);
+      if (this.grade) this.grade.flash = 1;
       this.hitstop(0.08);
       this.fx.stopTrails();
       this.specialFlight = false;
@@ -543,6 +617,10 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private endMatch(winner: Side) {
+    const wp = winner === -1 ? this.p1 : this.p2;
+    const pp = project(wp.x, 1, wp.z);
+    this.slowmo(0.35, 1.2);
+    this.dir.cut({ x: pp.x, y: pp.y - 40, zoom: this.baseZoom() * 1.3, panTime: 0.5, zoomTime: 0.6, priority: 4, duration: 4 }, this.now);
     this.state = 'over';
     this.stateT = 0;
     const w = winner === -1 ? this.p1 : this.p2;

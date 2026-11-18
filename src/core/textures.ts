@@ -314,21 +314,100 @@ export function generateTextures(scene: Phaser.Scene) {
   });
   // arena de la pista con granulado
   canvasTex(scene, 'sand', 512, 512, (c, w, h) => {
-    c.fillStyle = '#f9d27a'; // color de la arena del fondo pixel art
+    c.fillStyle = '#f7cf7c'; // color de la arena del fondo pixel art
     c.fillRect(0, 0, w, h);
-    for (let i = 0; i < 4000; i++) {
-      c.fillStyle = pick(['rgba(214,160,70,.35)', 'rgba(255,240,190,.55)', 'rgba(196,140,60,.25)']);
-      c.fillRect(rnd(0, w), rnd(0, h), rnd(1, 3), rnd(1, 2));
-    }
-    for (let i = 0; i < 40; i++) {
-      c.strokeStyle = 'rgba(200,140,60,.22)';
-      c.lineWidth = 2;
+    // ondulaciones suaves del viento (sin patrones repetidos llamativos)
+    for (let i = 0; i < 26; i++) {
+      c.strokeStyle = i % 2 ? 'rgba(255,240,200,.18)' : 'rgba(205,150,70,.12)';
+      c.lineWidth = rnd(2, 5);
       c.beginPath();
-      const x = rnd(0, w), y = rnd(0, h);
-      c.ellipse(x, y, rnd(10, 30), rnd(3, 6), 0, 0, Math.PI * 2);
+      const y0 = rnd(0, h), a = rnd(3, 7), f = rnd(0.01, 0.025), ph = rnd(0, 6);
+      for (let x = -10; x <= w + 10; x += 8) {
+        const y = y0 + Math.sin(x * f + ph) * a;
+        if (x === -10) c.moveTo(x, y); else c.lineTo(x, y);
+      }
       c.stroke();
     }
+    for (let i = 0; i < 5000; i++) {
+      c.fillStyle = pick(['rgba(214,160,70,.28)', 'rgba(255,244,205,.45)', 'rgba(190,135,55,.2)']);
+      c.fillRect(rnd(0, w), rnd(0, h), rnd(1, 2.5), rnd(1, 2));
+    }
   });
+  // huella en la arena y marca de bote de la bola
+  canvasTex(scene, 'footprint', 24, 14, (c) => {
+    c.fillStyle = 'rgba(150,95,35,.55)';
+    c.beginPath(); c.ellipse(7, 7, 6, 3.4, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,235,190,.5)';
+    c.beginPath(); c.ellipse(8, 5.6, 4, 1.4, 0, 0, Math.PI * 2); c.fill();
+  });
+  canvasTex(scene, 'ballmark', 40, 18, (c) => {
+    c.fillStyle = 'rgba(140,85,30,.5)';
+    c.beginPath(); c.ellipse(20, 9, 14, 6, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgba(255,238,195,.65)'; c.lineWidth = 2;
+    c.beginPath(); c.ellipse(20, 8, 17, 7.5, 0, Math.PI, Math.PI * 2); c.stroke();
+  });
+  // cometa del golpe especial (cabeza brillante + cola), uno por tema
+  for (const [key, cols] of [['comet_sun', ['255,255,235', '255,214,90', '255,120,20', '230,40,0']], ['comet_wave', ['240,255,255', '150,240,255', '40,190,240', '10,90,200']]] as [string, string[]][]) {
+    canvasTex(scene, key, 320, 96, (c, w, h) => {
+      const g = c.createLinearGradient(0, 0, w, 0);
+      g.addColorStop(0, `rgba(${cols[0]},1)`);
+      g.addColorStop(0.12, `rgba(${cols[1]},.95)`);
+      g.addColorStop(0.45, `rgba(${cols[2]},.7)`);
+      g.addColorStop(1, `rgba(${cols[3]},0)`);
+      c.fillStyle = g;
+      c.beginPath();
+      c.moveTo(18, h / 2);
+      c.bezierCurveTo(18, 6, 60, 10, w, h / 2 - 4);
+      c.bezierCurveTo(60, h - 10, 18, h - 6, 18, h / 2);
+      c.fill();
+      const r = c.createRadialGradient(30, h / 2, 2, 30, h / 2, 34);
+      r.addColorStop(0, `rgba(${cols[0]},1)`);
+      r.addColorStop(1, `rgba(${cols[1]},0)`);
+      c.fillStyle = r;
+      c.fillRect(0, 0, 80, h);
+    });
+  }
+  // siluetas suaves de público en primer plano (de espaldas, a contraluz), como en el vídeo
+  const sil = (c: CanvasRenderingContext2D, v: number, up: boolean, col: string, ox: number, oy: number) => {
+    c.save(); c.translate(ox, oy);
+    c.fillStyle = col; c.strokeStyle = col;
+    const cx = 130;
+    const kid = v === 4;
+    const hr = kid ? 50 : 62, hy = kid ? 150 : 128;
+    // hombros
+    c.beginPath(); c.ellipse(cx, 345, kid ? 100 : 128, 120, 0, 0, Math.PI * 2); c.fill();
+    c.fillRect(cx - 32, hy + 30, 64, 80);
+    // cabeza
+    c.beginPath(); c.ellipse(cx, hy, hr, hr * 1.12, 0, 0, Math.PI * 2); c.fill();
+    if (v === 1) { // gorra
+      c.beginPath(); c.ellipse(cx, hy - 26, hr + 6, 48, 0, Math.PI, 0); c.fill();
+      c.beginPath(); c.ellipse(cx + 52, hy - 22, 46, 10, 0.05, 0, Math.PI * 2); c.fill();
+    } else if (v === 2) { // melena
+      c.beginPath(); c.ellipse(cx, hy + 26, hr + 14, hr + 30, 0, 0, Math.PI * 2); c.fill();
+    } else if (v === 3) { // moño
+      c.beginPath(); c.arc(cx - 6, hy - hr - 12, 26, 0, Math.PI * 2); c.fill();
+    } else if (v === 5) { // pelo de punta
+      for (const [dx, h] of [[-40, 34], [-14, 44], [12, 42], [38, 30]]) { c.beginPath(); c.moveTo(cx + dx - 18, hy - hr + 16); c.lineTo(cx + dx + 18, hy - hr + 16); c.lineTo(cx + dx * 1.2, hy - hr - h); c.fill(); }
+    } else if (v === 6) { // cámara de fotos levantada
+      c.fillRect(cx + 40, hy - 30, 70, 46); c.beginPath(); c.arc(cx + 110, hy - 7, 20, 0, Math.PI * 2); c.fill();
+    }
+    if (up) {
+      c.lineCap = 'round'; c.lineWidth = 30;
+      c.beginPath(); c.moveTo(cx - 88, 290); c.quadraticCurveTo(cx - 130, 200, cx - 112, 120); c.stroke();
+      c.beginPath(); c.moveTo(cx + 88, 290); c.quadraticCurveTo(cx + 130, 200, cx + 112, 120); c.stroke();
+      c.beginPath(); c.arc(cx - 112, 112, 22, 0, Math.PI * 2); c.arc(cx + 112, 112, 22, 0, Math.PI * 2); c.fill();
+    }
+    c.restore();
+  };
+  for (let v = 0; v < 7; v++) {
+    for (const up of [false, true]) {
+      canvasTex(scene, `silS${v}${up ? 'b' : 'a'}`, 300, 420, (c) => {
+        sil(c, v, up, 'rgba(120,150,190,.55)', 0, 0); // contraluz arriba-izquierda
+        sil(c, v, up, '#121722', 5, 7);
+      });
+      scene.textures.get(`silS${v}${up ? 'b' : 'a'}`).setFilter(Phaser.Textures.FilterMode.LINEAR);
+    }
+  }
   // sombrilla y hamaca de la playa lejana
   canvasTex(scene, 'umbrella', 90, 80, (c, w, h) => {
     const cols = pick([['#ff5a5a', '#ffffff'], ['#3aa0ff', '#ffe066'], ['#ff9f1c', '#2ec4b6'], ['#7bd389', '#ffffff']]);
@@ -427,4 +506,8 @@ export function generateTextures(scene: Phaser.Scene) {
     c.fillStyle = '#ffffff';
     c.beginPath(); c.moveTo(0, 0); c.lineTo(16, 0); c.lineTo(8, 20); c.fill();
   });
+  for (const k of ['fronds', 'comet_sun', 'comet_wave', 'sun', 'rays', 'soft', 'flame', 'shadow', 'footprint', 'ballmark', 'sand']) {
+    if (scene.textures.exists(k)) scene.textures.get(k).setFilter(Phaser.Textures.FilterMode.LINEAR);
+  }
+
 }

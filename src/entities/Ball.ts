@@ -28,12 +28,14 @@ export class Ball {
   sprite: Phaser.GameObjects.Image;
   shadow: Phaser.GameObjects.Image;
   trailG: Phaser.GameObjects.Graphics;
+  comet: Phaser.GameObjects.Image;
   private trail: { x: number; y: number }[] = [];
 
   constructor(scene: Phaser.Scene) {
     this.shadow = scene.add.image(0, 0, 'shadow').setDepth(99).setScale(0.45, 0.6);
     this.trailG = scene.add.graphics().setDepth(240).setBlendMode(Phaser.BlendModes.ADD);
     this.sprite = scene.add.image(0, 0, 'ball').setDepth(250).setScale(0.5);
+    this.comet = scene.add.image(0, 0, 'comet_sun').setOrigin(0.08, 0.5).setDepth(249).setBlendMode(Phaser.BlendModes.ADD).setVisible(false);
   }
 
   launch(vx: number, vy: number, vz: number, hitter: Side, kind: ShotKind, theme: Theme) {
@@ -104,6 +106,15 @@ export class Ball {
     this.sprite.setDepth(depthFor(this.z) + 0.5);
     const hScale = Math.max(0.3, 1 - this.y * 0.08);
     this.shadow.setPosition(g.x, g.y).setScale(0.7 * p.k * hScale, 0.75 * p.k * hScale).setAlpha(0.8 * hScale);
+
+    // cometa de fuego/agua en el especial: orientado según la velocidad en pantalla
+    if (this.kind === 'special' && this.live && !this.held && this.speed > 8) {
+      const q = project(this.x + this.vx * 0.03, this.y + this.vy * 0.03, this.z + this.vz * 0.03);
+      const ang = Math.atan2(q.y - p.y, q.x - p.x);
+      const fl = 0.9 + Math.random() * 0.25;
+      this.comet.setTexture(this.theme === 'wave' ? 'comet_wave' : 'comet_sun').setVisible(true)
+        .setPosition(p.x, p.y).setRotation(ang + Math.PI).setScale(1.25 * p.k * fl, 0.9 * p.k * (0.9 + Math.random() * 0.2));
+    } else this.comet.setVisible(false);
 
     // estela: más larga y coloreada en golpes potentes
     const sp = this.speed;

@@ -42,3 +42,49 @@ export function applyRetro(cam: Phaser.Cameras.Scene2D.Camera, rows: number) {
   scale.on('resize', update);
   scene.events.once('shutdown', () => scale.off('resize', update));
 }
+
+/**
+ * Etalonaje "de vídeo" para la cámara del partido: luz cálida de playa, algo de contraste,
+ * resplandor suave alrededor del sol y viñeta. Acerca el aspecto plano del juego al look
+ * pintado y luminoso del vídeo de referencia.
+ */
+const gradeFrag = `
+precision mediump float;
+uniform sampler2D uMainSampler;
+uniform vec2 uSun;      // posición del sol en coordenadas de textura
+uniform float uAspect;
+uniform float uFlash;   // 0..1 destello extra (impactos)
+varying vec2 outTexCoord;
+void main() {
+  vec2 uv = outTexCoord;
+  vec4 col = texture2D(uMainSampler, uv);
+  vec3 c = col.rgb;
+  // contraste suave + calidez
+  c = (c - 0.5) * 1.07 + 0.5;
+  c *= vec3(1.045, 1.0, 0.93);
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  c = mix(vec3(l), c, 1.04);
+  // resplandor del sol
+  vec2 d = (uv - uSun) * vec2(uAspect, 1.0);
+  float glow = smoothstep(0.75, 0.0, length(d));
+  c += vec3(1.0, 0.9, 0.65) * glow * glow * 0.32;
+  // viñeta
+  vec2 q = (uv - 0.5) * vec2(1.0, 1.15);
+  float v = smoothstep(0.85, 0.32, length(q));
+  c *= mix(0.78, 1.0, v);
+  c += uFlash * 0.25;
+  gl_FragColor = vec4(clamp(c, 0.0, 1.0), col.a);
+}`;
+
+export class GradePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
+  sun: [number, number] = [0.3, 0.85];
+  flash = 0;
+  constructor(game: Phaser.Game) {
+    super({ game, name: 'GradePipeline', fragShader: gradeFrag });
+  }
+  onPreRender() {
+    this.set2f('uSun', this.sun[0], this.sun[1]);
+    this.set1f('uAspect', this.renderer.width / this.renderer.height);
+    this.set1f('uFlash', this.flash);
+  }
+}

@@ -81,7 +81,30 @@ src/
 - **Ajustes de controles** (`SettingsScene`, `core/settings.ts`): tamaño de la cruceta y de los botones, transparencia, cruceta flotante o fija, modo zurdo y colocación arrastrando. Se guardan en el dispositivo.
 - **Laboratorio de animación** (`LabScene`, botón LAB del menú o `#lab`): animaciones en bucle, cámara lenta, pausa y avance por fotograma, parámetros en vivo y fotogramas del vídeo de referencia para comparar.
 
-## 10. Siguientes pasos
+## 10. Auditoría frente al vídeo (noviembre 2026) y mejoras aplicadas
+Comparación del mismo fotograma a 848×528:
+- **Hecho**
+  - **Encuadre:** el zoom depende del ancho y del alto, así que las jugadoras mantienen su tamaño en cualquier pantalla.
+  - **Etalonaje cálido** (`GradePipeline`): contraste, resplandor del sol y viñeta.
+  - **Bruma de horizonte.**
+  - **Primer plano:** siluetas suaves a contraluz en dos filas y hojas de palmera fijas en las esquinas de la pantalla.
+  - **Vallas** con marcos metálicos y cristal en dos tonos; **red** con postes, cinta gruesa y sombra en la arena.
+  - **Arena** sin patrones repetidos, con huellas y marcas de bote que se desvanecen.
+  - **Cometa de fuego o agua** orientado según la velocidad en el especial.
+- **Jugabilidad**
+  - Controles fijos en partido; se colocan solo en el editor de ajustes (GUARDAR, CANCELAR y RESTABLECER).
+  - Diana que muestra dónde irá el golpe. Con movimiento asistido, mientras viene la bola la cruceta solo apunta.
+  - Contador de peloteo con euforia del público y carga extra del especial.
+  - Cartel de punto de partido y cámara lenta en el punto final.
+  - Tutorial la primera vez y "CÓMO JUGAR" en la pausa.
+  - Música chiptune procedural y murmullo del público, con ajustes de música y sonido.
+- **Pendiente** (necesita arte):
+  - público (sigue siendo la mayor diferencia con el vídeo)
+  - farolas y banderines
+  - marcador de madera
+  - sombrillas cercanas
+
+## 11. Siguientes pasos
 1. Multijugador online 1 vs 1 con Firebase Realtime Database (más baja latencia que Firestore). Modelo autoritativo del que saca, enviando solo los eventos de golpe (posición + velocidad), ya que la trayectoria es determinista.
 2. Vóley playa: `touchesPerSide: 3` y controles de recepción, colocación y remate. Futvóley: mismos toques usando el cuerpo. El escenario, la cámara, los efectos y el público se reutilizan tal cual.
 3. Arte final en sprite sheets, música, ranking global y personajes desbloqueables.

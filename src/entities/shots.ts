@@ -5,7 +5,7 @@ import type { ShotKind } from './Ball';
 const FLIGHT: Record<ShotKind, number> = {
   serve: 1.35, normal: 1.25, drive: 0.9, lob: 2.1, smash: 0.55, special: 0.46,
 };
-const DEPTH: Record<ShotKind, [number, number]> = {
+export const DEPTH: Record<ShotKind, [number, number]> = {
   serve: [5, 7.2], normal: [4, 7.2], drive: [5.5, 7.6], lob: [6, 7.6], smash: [3, 6.5], special: [3.5, 7],
 };
 

@@ -8,7 +8,7 @@ import { MenuScene } from './scenes/MenuScene';
 import { SettingsScene } from './scenes/SettingsScene';
 import { LabScene } from './scenes/LabScene';
 import { initBackend } from './services/backend';
-import { RetroPipeline } from './fx/RetroPipeline';
+import { GradePipeline, RetroPipeline } from './fx/RetroPipeline';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -22,7 +22,7 @@ const game = new Phaser.Game({
   },
   pixelArt: true,
   render: { antialias: false, pixelArt: true, roundPixels: false, powerPreference: 'high-performance' },
-  pipeline: { RetroPipeline } as any,
+  pipeline: { RetroPipeline, GradePipeline } as any,
   fps: { target: 60 },
   input: { activePointers: 4 },
   scene: [BootScene, MatchScene, MenuScene, HudScene, SettingsScene, LabScene],

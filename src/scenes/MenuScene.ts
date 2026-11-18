@@ -122,7 +122,8 @@ export class MenuScene extends Phaser.Scene {
     (screen.orientation as any)?.lock?.('landscape').catch?.(() => {});
     this.scene.stop('Match');
     this.scene.start('Match', { mode: 'play', difficulty: this.difficulty, points: this.points });
-    this.scene.launch('Hud');
+    // datos explícitos: si no, Phaser reutiliza los del último lanzamiento (p. ej. modo edición de ajustes)
+    this.scene.launch('Hud', { edit: false, standalone: false });
     this.scene.bringToTop('Hud');
     this.scene.stop();
   }

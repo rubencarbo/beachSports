@@ -87,6 +87,16 @@ export class Effects {
     this.scene.tweens.add({ targets: glow, scale: 6, alpha: 0, duration: 500, onComplete: () => glow.destroy() });
   }
 
+  private decals: Phaser.GameObjects.Image[] = [];
+  /** Huellas y marcas en la arena: se desvanecen en unos segundos (máximo 60 a la vez). */
+  decal(key: string, x: number, y: number, k: number, flip: boolean) {
+    let d = this.decals.length >= 60 ? this.decals.shift()! : this.scene.add.image(0, 0, key).setDepth(12);
+    this.scene.tweens.killTweensOf(d);
+    d.setTexture(key).setPosition(x, y).setScale(k).setFlipX(flip).setAlpha(0.9).setVisible(true);
+    this.decals.push(d);
+    this.scene.tweens.add({ targets: d, alpha: 0, delay: 2500, duration: 3500 });
+  }
+
   /** Estela del golpe (arco blanco muy rápido) para vender el latigazo. */
   swoosh(x: number, y: number, facing: number, over: boolean, k: number, theme: Theme | null) {
     const g = this.scene.add.graphics().setDepth(255).setBlendMode('ADD');

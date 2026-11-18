@@ -31,6 +31,7 @@ export class HudScene extends Phaser.Scene {
   private drag: { id: CtrlId; pid: number; dx: number; dy: number } | null = null;
   private pauseUi?: Phaser.GameObjects.Container;
   private serving = false;
+  private editMarks?: Phaser.GameObjects.Graphics;
   private target = 7;
 
   constructor() { super('Hud'); }
@@ -74,13 +75,16 @@ export class HudScene extends Phaser.Scene {
     const onFace = (d: { side: number; expr: number; dur: number }) => this.setFace(d.side, d.expr, d.dur);
     const onEdit = (mode?: 'settings') => { this.editMode = mode === 'settings' ? 'settings' : 'place'; this.setEdit(true); };
     const onEditEnd = () => { this.setEdit(false); this.showPause(); };
+    const onEditOff = () => this.setEdit(false);
+    const onRally = (n: number) => this.onRally(n);
+    const onBanner = (t: string) => this.banner(t);
     const onSettingsClosed = () => this.showPause();
     ev.on('hud', onHud); ev.on('point', onPoint); ev.on('match-over', onOver); ev.on('face', onFace);
-    ev.on('hud-edit', onEdit); ev.on('hud-settings-closed', onSettingsClosed); ev.on('hud-edit-end', onEditEnd);
+    ev.on('hud-edit', onEdit); ev.on('hud-settings-closed', onSettingsClosed); ev.on('hud-edit-end', onEditEnd); ev.on('hud-edit-off', onEditOff); ev.on('rally', onRally); ev.on('banner', onBanner);
     const offSettings = onSettings(() => this.layout());
     this.events.once('shutdown', () => {
       ev.off('hud', onHud); ev.off('point', onPoint); ev.off('match-over', onOver); ev.off('face', onFace);
-      ev.off('hud-edit', onEdit); ev.off('hud-settings-closed', onSettingsClosed); ev.off('hud-edit-end', onEditEnd); offSettings();
+      ev.off('hud-edit', onEdit); ev.off('hud-settings-closed', onSettingsClosed); ev.off('hud-edit-end', onEditEnd); ev.off('hud-edit-off', onEditOff); ev.off('rally', onRally); ev.off('banner', onBanner); offSettings();
     });
     applyRetro(this.cameras.main, 2000);
     this.scale.on('resize', this.layout, this);
@@ -88,6 +92,79 @@ export class HudScene extends Phaser.Scene {
     if (this.standalone) { this.panelTop.setVisible(false); this.pauseBtn.setVisible(false); }
     this.layout();
     if (this.edit) this.setEdit(true);
+    let seen = false;
+    try { seen = localStorage.getItem('beachsports.tutorial') === '1'; } catch { /* sin almacenamiento */ }
+    if (!this.standalone && !this.edit && !seen) this.time.delayedCall(700, () => this.startTutorial());
+  }
+
+  // ------------------------------------------------------------ peloteo y carteles
+  private rallyBadge?: Phaser.GameObjects.Container;
+  private onRally(n: number) {
+    if (n < 4) { if (this.rallyBadge) { const b = this.rallyBadge; this.rallyBadge = undefined; this.tweens.add({ targets: b, alpha: 0, duration: 250, onComplete: () => b.destroy() }); } return; }
+    const w = this.scale.width;
+    const sc = this.panelTop.scale;
+    if (!this.rallyBadge) {
+      this.rallyBadge = this.add.container(w / 2, 8 + 128 * sc).setDepth(21);
+    }
+    const b = this.rallyBadge;
+    b.removeAll(true);
+    const col = n >= 12 ? UI.red : n >= 8 ? UI.orange : UI.yellow;
+    const g = this.add.graphics();
+    block(g, -120, -24, 240, 48, col);
+    b.add([g, label(this, 0, 0, `PELOTEO ×${n}`, 26, n >= 8 ? '#fff3d6' : '#1b2240', { stroke: n >= 8 ? '#1b2240' : '#fff3d6', strokeThickness: 4 })]);
+    b.setScale(1.35);
+    this.tweens.add({ targets: b, scale: 1, duration: 220, ease: 'Back.Out' });
+  }
+
+  private banner(t: string) {
+    const w = this.scale.width, h = this.scale.height;
+    const c = this.add.container(-w, h * 0.42).setDepth(46);
+    const g = this.add.graphics();
+    const bw = Math.min(w - 80, 900);
+    g.fillStyle(shade(UI.red, 0.6), 1).fillTriangle(-bw / 2 - 40, 4, -bw / 2, -30, -bw / 2, 38).fillTriangle(bw / 2 + 40, 4, bw / 2, -30, bw / 2, 38);
+    block(g, -bw / 2, -40, bw, 84, UI.red);
+    c.add([g, label(this, 0, 2, t, 40, '#fff3d6', { title: true })]);
+    sfx.whistle();
+    this.tweens.add({ targets: c, x: w / 2, duration: 380, ease: 'Back.Out' });
+    this.tweens.add({ targets: c, x: w * 2, delay: 1900, duration: 320, ease: 'Cubic.In', onComplete: () => c.destroy() });
+  }
+
+  // ------------------------------------------------------------ tutorial
+  private tutUi?: Phaser.GameObjects.Container;
+  private tutTarget: CtrlId | null = null;
+  startTutorial() {
+    if (this.tutUi) return;
+    if (this.scene.isActive('Match')) this.scene.pause('Match');
+    const touch = this.touch;
+    const steps: { t: string; target: CtrlId | null }[] = [
+      { t: touch ? 'Muévete con la CRUCETA. Con el movimiento ASISTIDO tu jugadora corre sola hacia la bola.' : 'Muévete con WASD o las flechas. Con el movimiento ASISTIDO tu jugadora corre sola hacia la bola.', target: 'stick' },
+      { t: touch ? 'Cuando venga la bola verás un ANILLO en la arena. Pulsa GOLPE justo cuando se ponga VERDE: ¡golpe perfecto!' : 'Cuando venga la bola verás un ANILLO en la arena. Pulsa J o ESPACIO justo cuando se ponga VERDE: ¡golpe perfecto!', target: 'hit' },
+      { t: 'Mientras viene la bola, la dirección APUNTA tu golpe: hacia la red = tiro PLANO, hacia atrás = GLOBO, arriba o abajo = a qué lado. La DIANA del campo rival te muestra dónde irá.', target: 'stick' },
+      { t: touch ? 'Si la bola va alta, GOLPE hace un REMATE en salto. Llena la barra y pulsa ★ para lanzar tu golpe ESPECIAL.' : 'Si la bola va alta, golpear hace un REMATE en salto. Llena la barra y pulsa L para lanzar tu golpe ESPECIAL.', target: 'special' },
+    ];
+    let i = 0;
+    const show = () => {
+      this.tutUi?.destroy();
+      const w = this.scale.width, h = this.scale.height;
+      const c = this.add.container(0, 0).setDepth(95);
+      c.add(this.add.rectangle(0, 0, w, h, 0x0b1a2a, 0.45).setOrigin(0).setInteractive());
+      const pw = Math.min(900, w - 80);
+      const p = panel(this, w / 2, h * 0.37, pw, 280, { title: `CÓMO JUGAR ${i + 1}/${steps.length}`, titleColor: UI.teal });
+      p.add(label(this, 0, -22, steps[i].t, 31, '#fff3d6', { wordWrap: { width: pw - 70 }, align: 'center' }));
+      const last = i === steps.length - 1;
+      p.add(button(this, pw / 2 - 150, 96, 240, 62, last ? '¡A JUGAR!' : 'SIGUIENTE', () => { if (last) this.endTutorial(); else { i++; show(); } }, { color: UI.green, size: 24 }).c);
+      p.add(button(this, -pw / 2 + 110, 96, 170, 52, 'SALTAR', () => this.endTutorial(), { color: UI.grey, size: 20 }).c);
+      c.add(p);
+      this.tutUi = c;
+      this.tutTarget = touch ? steps[i].target : null;
+    };
+    show();
+  }
+
+  private endTutorial() {
+    this.tutUi?.destroy(); this.tutUi = undefined; this.tutTarget = null;
+    try { localStorage.setItem('beachsports.tutorial', '1'); } catch { /* ignorar */ }
+    if (!this.pauseUi && this.scene.isPaused('Match')) this.scene.resume('Match');
   }
 
   // ------------------------------------------------------------ marcador tipo TV
@@ -232,14 +309,12 @@ export class HudScene extends Phaser.Scene {
           return;
         }
       }
+      // cruceta fija: la base no se mueve nunca durante el partido; se activa tocando cerca
       const home = ctrlPos('stick', w, this.scale.height);
-      const onStickSide = st.leftHanded ? p.x > w * 0.5 : p.x < w * 0.5;
-      const nearHome = Phaser.Math.Distance.Between(p.x, p.y, home.x, home.y) < 84 * st.stickScale * 1.7;
-      if (this.stick.pid < 0 && p.y > 100 && (st.stickMode === 'floating' ? onStickSide : nearHome)) {
+      const nearHome = Phaser.Math.Distance.Between(p.x, p.y, home.x, home.y) < 84 * st.stickScale * 2.0;
+      if (this.stick.pid < 0 && nearHome) {
         this.stick.pid = p.id;
-        if (st.stickMode === 'floating') { this.stick.ox = p.x; this.stick.oy = p.y; } else { this.stick.ox = home.x; this.stick.oy = home.y; }
-        this.stick.c.setPosition(this.stick.ox, this.stick.oy);
-        this.stick.knob.setPosition(this.stick.ox, this.stick.oy);
+        this.stick.ox = home.x; this.stick.oy = home.y;
         this.moveStick(p);
       }
     });
@@ -296,6 +371,32 @@ export class HudScene extends Phaser.Scene {
     for (const b of this.btns) b.c.setVisible(show).setAlpha(a);
   }
 
+  /** En el editor: anillo punteado y animado alrededor de cada control (se ve que se puede arrastrar). */
+  private drawEditMarksDepth() { if (this.editMarks) this.editMarks.setDepth(this.tutTarget ? 96 : 29); }
+  private drawEditMarks() {
+    this.drawEditMarksDepth();
+    if (!this.edit && !this.tutTarget) { this.editMarks?.clear(); return; }
+    if (!this.editMarks) this.editMarks = this.add.graphics().setDepth(29);
+    const g = this.editMarks;
+    g.clear();
+    const st = getSettings();
+    const t = this.time.now / 600;
+    const items = [
+      { x: this.stick.c.x, y: this.stick.c.y, r: 84 * st.stickScale + 14, id: 'stick' as CtrlId },
+      ...this.btns.map((b) => ({ x: b.c.x, y: b.c.y, r: b.r * st.btnScale + 16, id: b.key as CtrlId })),
+    ];
+    for (const it of items) {
+      if (!this.edit && it.id !== this.tutTarget) continue;
+      const active = this.drag?.id === it.id;
+      g.lineStyle(5, active ? UI.green : UI.yellow, 1);
+      const n = 22;
+      for (let i = 0; i < n; i += 2) {
+        const a0 = t + (i / n) * Math.PI * 2, a1 = t + ((i + 1) / n) * Math.PI * 2;
+        g.beginPath(); g.arc(it.x, it.y, it.r, a0, a1); g.strokePath();
+      }
+    }
+  }
+
   // ------------------------------------------------------------ colocar controles
   private startDrag(p: Phaser.Input.Pointer) {
     const st = getSettings();
@@ -312,7 +413,7 @@ export class HudScene extends Phaser.Scene {
     const w = this.scale.width, h = this.scale.height;
     const st = getSettings();
     let fx = Phaser.Math.Clamp((p.x + this.drag.dx) / w, 0.04, 0.96);
-    const fy = Phaser.Math.Clamp((p.y + this.drag.dy) / h, 0.08, 0.95);
+    const fy = Phaser.Math.Clamp((p.y + this.drag.dy) / h, this.editMode === 'settings' ? 0.36 : 0.08, 0.95);
     if (st.leftHanded) fx = 1 - fx;
     updateSettings({ pos: { ...st.pos, [this.drag.id]: { x: fx, y: fy } } });
   }
@@ -344,13 +445,14 @@ export class HudScene extends Phaser.Scene {
     const w = this.scale.width, h = this.scale.height;
     const c = this.add.container(0, 0).setDepth(90);
     c.add(this.add.rectangle(0, 0, w, h, 0x0b1a2a, 0.6).setOrigin(0).setInteractive());
-    const p = panel(this, w / 2, h / 2 + 24, 500, 420, { title: 'PAUSA', titleColor: UI.teal });
+    const p = panel(this, w / 2, h / 2 + 24, 500, Math.min(h - 70, 510), { title: 'PAUSA', titleColor: UI.teal });
     const items: [string, IconName, number, () => void][] = [
       ['CONTINUAR', 'play', UI.green, () => this.resume()],
+      ['CÓMO JUGAR', 'check', UI.teal, () => { this.pauseUi?.destroy(); this.pauseUi = undefined; this.startTutorial(); }],
       ['AJUSTES', 'gear', UI.orange, () => { this.pauseUi?.destroy(); this.pauseUi = undefined; this.scene.launch('Settings', { from: 'hud' }); this.scene.bringToTop('Settings'); }],
       ['MENÚ', 'home', UI.blue, () => { this.scene.resume('Match'); this.backToMenu(); }],
     ];
-    items.forEach(([t, ic, col, cb], i) => p.add(button(this, 0, -96 + i * 104, 400, 82, t, cb, { color: col, icon: ic, size: 34 }).c));
+    items.forEach(([t, ic, col, cb], i) => p.add(button(this, 0, -150 + i * 96, 400, 78, t, cb, { color: col, icon: ic, size: 32 }).c));
     c.add(p);
     p.setScale(0.6).setAlpha(0);
     this.tweens.add({ targets: p, scale: 1, alpha: 1, duration: 220, ease: 'Back.Out' });
@@ -476,6 +578,10 @@ export class HudScene extends Phaser.Scene {
       if (this.stick.pid < 0 && (kx || ky || !this.touch)) { playerInput.mx = kx; playerInput.my = ky; }
     }
     this.drawMeters();
+    this.drawEditMarks();
+    const tut = !!this.tutTarget;
+    this.stick.c.setDepth(tut ? 96 : 30); this.stick.knob.setDepth(tut ? 97 : 31);
+    for (const b of this.btns) b.c.setDepth(tut ? 96 : 30);
     for (const f of this.faces) if (f.until && this.time.now > f.until) { f.until = 0; f.img.setFrame('head'); }
     // botón especial: anillo de carga alrededor
     const sp = this.btns[2];

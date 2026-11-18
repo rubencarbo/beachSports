@@ -4,13 +4,14 @@
 export type CtrlId = 'stick' | 'hit' | 'jump' | 'special';
 
 export interface Settings {
-  stickScale: number; // 0.6 .. 1.8
-  btnScale: number; // 0.6 .. 1.8
-  opacity: number; // 0.15 .. 1
-  stickMode: 'floating' | 'fixed';
+  stickScale: number; // 0.6 .. 2
+  btnScale: number; // 0.6 .. 2
+  opacity: number; // 0.15 .. 0.9
   leftHanded: boolean;
   assist: boolean; // movimiento asistido hacia la bola
   autoSmash: boolean; // GOLPE con bola alta = salto + remate automático
+  music: boolean;
+  sound: boolean;
   /** posición del centro de cada control como fracción de la pantalla (0..1) */
   pos: Record<CtrlId, { x: number; y: number }>;
 }
@@ -23,7 +24,7 @@ export const DEFAULT_POS: Settings['pos'] = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  stickScale: 1, btnScale: 1, opacity: 0.75, stickMode: 'floating', leftHanded: false, assist: true, autoSmash: true,
+  stickScale: 1, btnScale: 1, opacity: 0.75, leftHanded: false, assist: true, autoSmash: true, music: true, sound: true,
   pos: JSON.parse(JSON.stringify(DEFAULT_POS)),
 };
 
@@ -36,7 +37,10 @@ function load(): Settings {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw);
-      return { ...DEFAULT_SETTINGS, ...s, pos: { ...JSON.parse(JSON.stringify(DEFAULT_POS)), ...(s.pos || {}) } };
+      const out: Settings = { ...DEFAULT_SETTINGS, ...s, pos: { ...JSON.parse(JSON.stringify(DEFAULT_POS)), ...(s.pos || {}) } };
+      out.opacity = Math.min(0.9, Math.max(0.15, out.opacity));
+      delete (out as any).stickMode;
+      return out;
     }
   } catch { /* sin almacenamiento: valores por defecto */ }
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -51,6 +55,12 @@ export function updateSettings(patch: Partial<Settings>) {
 }
 
 export function resetSettings() { updateSettings(JSON.parse(JSON.stringify(DEFAULT_SETTINGS))); }
+
+/** Sólo los controles (posición, tamaño, transparencia) vuelven a los valores por defecto. */
+export function resetControls() {
+  const d = DEFAULT_SETTINGS;
+  updateSettings({ stickScale: d.stickScale, btnScale: d.btnScale, opacity: d.opacity, pos: JSON.parse(JSON.stringify(DEFAULT_POS)) });
+}
 
 export function onSettings(fn: (s: Settings) => void) {
   listeners.add(fn);
