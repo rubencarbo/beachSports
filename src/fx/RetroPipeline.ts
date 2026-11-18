@@ -54,6 +54,9 @@ uniform sampler2D uMainSampler;
 uniform vec2 uSun;      // posición del sol en coordenadas de textura
 uniform float uAspect;
 uniform float uFlash;   // 0..1 destello extra (impactos)
+uniform vec3 uTint;     // tinte de la sede
+uniform float uSunset;  // 0..1 atardecer
+uniform float uGlow;    // intensidad del resplandor del sol
 varying vec2 outTexCoord;
 void main() {
   vec2 uv = outTexCoord;
@@ -61,13 +64,15 @@ void main() {
   vec3 c = col.rgb;
   // contraste suave + calidez
   c = (c - 0.5) * 1.07 + 0.5;
-  c *= vec3(1.045, 1.0, 0.93);
+  c *= uTint;
+  // atardecer: cielo rosado arriba y luz anaranjada general
+  c = mix(c, c * vec3(1.06, 0.74, 0.86), uSunset * smoothstep(0.35, 1.0, uv.y) * 0.55);
   float l = dot(c, vec3(0.299, 0.587, 0.114));
   c = mix(vec3(l), c, 1.04);
   // resplandor del sol
   vec2 d = (uv - uSun) * vec2(uAspect, 1.0);
   float glow = smoothstep(0.75, 0.0, length(d));
-  c += vec3(1.0, 0.9, 0.65) * glow * glow * 0.32;
+  c += mix(vec3(1.0, 0.9, 0.65), vec3(1.0, 0.6, 0.35), uSunset) * glow * glow * uGlow;
   // viñeta
   vec2 q = (uv - 0.5) * vec2(1.0, 1.15);
   float v = smoothstep(0.85, 0.32, length(q));
@@ -79,6 +84,9 @@ void main() {
 export class GradePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
   sun: [number, number] = [0.3, 0.85];
   flash = 0;
+  tint: [number, number, number] = [1.045, 1.0, 0.93];
+  sunset = 0;
+  glow = 0.32;
   constructor(game: Phaser.Game) {
     super({ game, name: 'GradePipeline', fragShader: gradeFrag });
   }
@@ -86,5 +94,8 @@ export class GradePipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipelin
     this.set2f('uSun', this.sun[0], this.sun[1]);
     this.set1f('uAspect', this.renderer.width / this.renderer.height);
     this.set1f('uFlash', this.flash);
+    this.set3f('uTint', this.tint[0], this.tint[1], this.tint[2]);
+    this.set1f('uSunset', this.sunset);
+    this.set1f('uGlow', this.glow);
   }
 }

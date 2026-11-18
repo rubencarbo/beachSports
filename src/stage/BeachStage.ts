@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { COURT, COLORS, HORIZON_Y, STAGE_CX, STAGE_W, project } from '../config';
 import { CAM_BASE_Y } from '../fx/CameraDirector';
 import { SIL_TYPES } from '../core/textures';
+import { Venue, getVenue } from '../game/venues';
 import { PIXEL_FONT } from '../core/fonts';
 
 /**
@@ -30,7 +31,9 @@ export class BeachStage {
   private netG!: Phaser.GameObjects.Graphics;
   boardTexts: Phaser.GameObjects.Text[] = [];
 
-  constructor(private scene: Phaser.Scene) {
+  private ads: { im: Phaser.GameObjects.Image; x: number }[] = [];
+
+  constructor(private scene: Phaser.Scene, public venue: Venue = getVenue('mediodia')) {
     this.build();
   }
 
@@ -108,13 +111,19 @@ export class BeachStage {
       pole.fillStyle(0x8a94a4, 1).fillRect(p.x - 5, p.y - 420, 3, 420);
       pole.fillStyle(0x3a404c, 1).fillRect(p.x - 30, p.y - 436, 60, 22);
       pole.fillStyle(0xfff4c0, 1).fillRect(p.x - 26, p.y - 418, 52, 6);
+      if (this.venue.lamps) {
+        // farolas encendidas (final al atardecer): halo cálido
+        const glow = s.add.image(p.x, p.y - 412, 'soft').setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd890).setScale(4.2).setAlpha(0.85);
+        back.add(glow);
+        s.tweens.add({ targets: glow, alpha: 0.65, duration: 900 + Math.random() * 400, yoyo: true, repeat: -1 });
+      }
       back.add(pole);
     }
 
     // banderines (de farola a farola)
     const bunt = this.layer(0.66, 0.88, 7);
     const pL = project(-11.5, 0, COURT.fenceZ + 0.6), pR = project(11.5, 0, COURT.fenceZ + 0.6);
-    const flagCols = [0xff5a5a, 0xffd23f, 0x3ab0ff, 0x7bd389, 0xff9f1c, 0xc77dff];
+    const flagCols = this.venue.bunting;
     for (const [x0, x1, y0, sag] of [[pL.x, pR.x, pL.y - 405, 70], [pL.x - 700, pL.x, pL.y - 380, 50], [pR.x, pR.x + 700, pR.y - 380, 50]]) {
       const line = s.add.graphics();
       line.lineStyle(1.5, 0x555555, 1);
@@ -136,8 +145,8 @@ export class BeachStage {
     const crowd = this.layer(0.69, 0.95, 8);
     // público ilustrado (atlas 'crowd': f0..f7 con pose tranquila 'a' y animando 'b', y perro)
     const rows = [
-      { z: COURT.fenceZ + 1.7, n: 19, back: true },
-      { z: COURT.fenceZ + 0.6, n: 15, back: false },
+      { z: COURT.fenceZ + 1.7, n: Math.round(19 * this.venue.crowd), back: true },
+      { z: COURT.fenceZ + 0.6, n: Math.round(15 * this.venue.crowd), back: false },
     ];
     const CROWD_SCALE = 2.45; // la altura del público ~60 % de la de las jugadoras
     for (const r of rows) {
@@ -213,7 +222,7 @@ export class BeachStage {
     const s = this.scene;
     // arena
     const sandTop = project(0, 0, COURT.fenceZ - 0.05).y; // empieza en la valla: el público de detrás se ve de cuerpo entero
-    const sand = s.add.tileSprite(STAGE_CX, sandTop, STAGE_W + 1600, 900, 'sand').setOrigin(0.5, 0);
+    const sand = s.add.tileSprite(STAGE_CX, sandTop, STAGE_W + 1600, 900, `sand_${this.venue.id}`).setOrigin(0.5, 0);
     c.add(sand);
     const shade = s.add.graphics();
     // sombreado suave bajo la valla
@@ -281,7 +290,7 @@ export class BeachStage {
         g.lineStyle(6, 0x2b3038, 1).lineBetween(a.x, a.y, b.x, b.y);
         g.fillStyle(0xffffff, 1).fillCircle(b.x, b.y, 3.5 * a.k);
       }
-      g.lineStyle(3, 0xe8433a, 1);
+      g.lineStyle(3, this.venue.rope, 1);
       g.beginPath();
       for (let i = 0; i <= 40; i++) {
         const x = -5.3 + (10.6 * i) / 40;
@@ -291,15 +300,17 @@ export class BeachStage {
       }
       g.strokePath();
     }
-    // carteles en el cristal
-    for (const x of [-8.6, 6.6]) {
-      const a = P(x, 0.25, fz), b = P(x + 1.6, 0.85, fz);
-      g.fillStyle(0xf4f8ff, 0.95).fillRect(a.x, b.y, b.x - a.x, a.y - b.y);
-      g.lineStyle(3, 0x2a7fd6, 1);
-      g.beginPath();
-      g.moveTo(a.x + 8, a.y - 12);
-      for (let i = 0; i <= 10; i++) g.lineTo(a.x + 8 + i * ((b.x - a.x - 16) / 10), a.y - 12 - Math.sin(i * 0.9) * 8);
-      g.strokePath();
+    // vallas publicitarias sobre el cristal de las esquinas (se recolocan con la perspectiva)
+    if (!this.ads.length) {
+      const xs = [-9.28, -6.63, 6.63, 9.28];
+      xs.forEach((x, i) => {
+        const key = `ad_${this.venue.ads[i % this.venue.ads.length]}`;
+        this.ads.push({ im: this.scene.add.image(0, 0, key).setDepth(11.5), x });
+      });
+    }
+    for (const a of this.ads) {
+      const l = P(a.x - 1.1, 0.12, fz), r = P(a.x + 1.1, 0.12, fz), t = P(a.x, 0.82, fz);
+      a.im.setPosition((l.x + r.x) / 2, (l.y + t.y) / 2).setDisplaySize(r.x - l.x, l.y - t.y);
     }
 
     // laterales (cristal en perspectiva)

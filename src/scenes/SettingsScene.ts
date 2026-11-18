@@ -56,7 +56,9 @@ export class SettingsScene extends Phaser.Scene {
     seg(2, 'Remate', ['AUTOMÁTICO', 'CON SALTO'], s.autoSmash ? 0 : 1, (j) => updateSettings({ autoSmash: j === 0 }));
     seg(3, 'Música', ['SÍ', 'NO'], s.music ? 0 : 1, (j) => { updateSettings({ music: j === 0 }); this.game.events.emit('audio-settings'); });
     seg(4, 'Sonido', ['SÍ', 'NO'], s.sound ? 0 : 1, (j) => { updateSettings({ sound: j === 0 }); this.game.events.emit('audio-settings'); });
-    p.add(button(this, 0, ph / 2 - 150, pw - 120, 80, 'PERSONALIZAR CONTROLES', () => this.openEditor(), { color: UI.orange, icon: 'move', size: 30 }).c);
+    const bw2 = (pw - 140) / 2;
+    p.add(button(this, -bw2 / 2 - 10, ph / 2 - 150, bw2, 80, 'CONTROLES', () => this.openEditor(), { color: UI.orange, icon: 'move', size: 28 }).c);
+    p.add(button(this, bw2 / 2 + 10, ph / 2 - 150, bw2, 80, 'PERSONAJES', () => { this.scene.launch('CharStudio', { from: this.from }); this.scene.stop(); }, { color: UI.teal, icon: 'star', size: 28 }).c);
     p.add(button(this, 0, ph / 2 - 58, 320, 70, 'VOLVER', () => this.close(), { color: UI.green, icon: 'check', size: 28 }).c);
   }
 

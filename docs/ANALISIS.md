@@ -118,7 +118,21 @@ Comparación del mismo fotograma a 848×528:
   - La potencia acorta el vuelo hasta un 36 %. Golpear la bola por debajo de 2 m resta calidad. Si no golpeas, se repite.
   - La máquina usa la misma barra, con una dispersión según la dificultad.
 
-## 12. Siguientes pasos
+## 12. Personajes, torneo y sedes
+- **Catálogo** (`src/game/roster.ts`): 8 jugadoras.
+  - SOL y OLA tienen arte propio. CORAL, LIMA, UVA, FRESA, MENTA y NOCHE son variantes de color generadas al arrancar; la piel se protege con la paleta de los brazos.
+  - Cada una tiene estadísticas: velocidad (±6 % de carrera por punto), potencia (vuelo de la bola ±5 %) y control (+0,05 de precisión por punto). El especial puede ser de fuego o de agua.
+- **Selección de jugadora** antes de cada partido. En amistoso también se eligen rival (o al azar) y sede.
+- **Torneo de 8** (`src/game/tournament.ts`, `BracketScene`):
+  - Cuartos (fácil, Playa del Sol), semifinal (normal, Bahía Blanca) y final (difícil, Gran Final al atardecer).
+  - El resto de partidos se simula según las estadísticas. Hay pantalla de cuadro entre rondas y de campeona.
+- **Sedes** (`src/game/venues.ts`): cambian arena, etalonaje (tinte y atardecer), publicidad con marcas ficticias, cordón, banderines, cantidad de público y farolas encendidas en la final.
+- **Estudio de personajes** (Ajustes → PERSONAJES, `CharStudioScene`):
+  1. Formulario que genera el prompt completo (`charPrompt.ts`), con botón para copiar.
+  2. Importador en el navegador (`charImport.ts`, versión en TypeScript de `ingest_parts.py`): detecta el tamaño de píxel, quita el croma, separa piezas (y cabezas que se tocan), propone el papel de cada pieza con desplegables para corregirlo, parte brazo y pierna, crea el atlas y lo guarda en el dispositivo.
+  3. Lista de personajes importados, con opción de borrar.
+
+## 13. Siguientes pasos
 1. Multijugador online 1 vs 1 con Firebase Realtime Database (más baja latencia que Firestore). Modelo autoritativo del que saca, enviando solo los eventos de golpe (posición + velocidad), ya que la trayectoria es determinista.
 2. Vóley playa: `touchesPerSide: 3` y controles de recepción, colocación y remate. Futvóley: mismos toques usando el cuerpo. El escenario, la cámara, los efectos y el público se reutilizan tal cual.
 3. Arte final en sprite sheets, música, ranking global y personajes desbloqueables.

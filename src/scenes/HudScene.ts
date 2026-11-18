@@ -3,6 +3,8 @@ import { sfx } from '../core/audio';
 import { playerInput } from '../core/input';
 import { CtrlId, ctrlPos, getSettings, onSettings, updateSettings } from '../core/settings';
 import { applyRetro } from '../fx/RetroPipeline';
+import { getChar } from '../game/roster';
+import { clearTournament, reportResult } from '../game/tournament';
 import { IconName, LABEL_FONT, TITLE_FONT, UI, block, button, cutRect, icon, label, panel, shade } from '../ui/kit';
 
 interface Btn { c: Phaser.GameObjects.Container; g: Phaser.GameObjects.Graphics; r: number; key: 'hit' | 'jump' | 'special'; pid: number; color: number; icon: IconName; text: string }
@@ -246,9 +248,11 @@ export class HudScene extends Phaser.Scene {
     this.meters = this.add.graphics();
     this.serveIcon = this.add.graphics();
     c.add([...this.scoreTxt, ...this.names, this.meters, this.serveIcon]);
-    for (const [i, key, x] of [[0, 'rig_sun', -W / 2 + 30], [1, 'rig_wave', W / 2 - 30]] as [number, string, number][]) {
+    const mc = (this.scene.get('Match') as any)?.cfg ?? {};
+    const c1 = getChar(mc.p1), c2 = getChar(mc.p2);
+    for (const [i, key, x] of [[0, c1.tex, -W / 2 + 30], [1, c2.tex, W / 2 - 30]] as [number, string, number][]) {
       const fg = this.add.graphics();
-      block(fg, x - 38, 0, 76, 80, i === 0 ? UI.orange : UI.teal);
+      block(fg, x - 38, 0, 76, 80, i === 0 ? c1.color : c2.color);
       cutRect(fg, x - 30, 8, 60, 64, 0x8fd3f5, 1, 4);
       fg.fillStyle(0xffe2a3, 1).fillRect(x - 30, 58, 60, 14);
       const img = this.add.image(x, 72, key, 'head').setOrigin(0.5, 1).setScale(1.55).setFlipX(i === 1);
@@ -531,7 +535,7 @@ export class HudScene extends Phaser.Scene {
   // ------------------------------------------------------------ eventos
   private onHud(d: any) {
     this.meterVals = { a: d.meterA, b: d.meterB, pa: d.poweredA, pb: d.poweredB };
-    this.names[0].setText(d.names[0] === 'TU' ? 'TÚ' : d.names[0]);
+    this.names[0].setText(d.names[0]);
     this.names[1].setText(d.names[1]);
     this.serving = !!d.serving;
     if (this.meterActive) return;
@@ -596,7 +600,8 @@ export class HudScene extends Phaser.Scene {
     const pg = this.add.graphics();
     block(pg, -290, -170, 170, 190, won ? UI.orange : UI.teal);
     cutRect(pg, -280, -160, 150, 170, 0x8fd3f5, 1, 4);
-    const hk = won ? 'rig_sun' : 'rig_wave';
+    const mc2 = (this.scene.get('Match') as any)?.cfg ?? {};
+    const hk = getChar(won ? mc2.p1 : mc2.p2).tex;
     const head = this.add.image(-205, 4, hk, this.textures.get(hk).has('head_laugh') ? 'head_laugh' : 'head_happy').setOrigin(0.5, 1).setScale(3.7).setFlipX(!won);
     const tg = this.add.graphics();
     icon(tg, 'trophy', -205, 52, 46, UI.yellow);
@@ -610,8 +615,14 @@ export class HudScene extends Phaser.Scene {
       block(rg, -80, yy - 20, 340, 40, UI.inkSoft, { shadow: false, border: 3 });
       p.add([rg, label(this, -60, yy, k, 24).setOrigin(0, 0.5), label(this, 238, yy, v, 26, '#ffd23f').setOrigin(1, 0.5)]);
     });
-    p.add(button(this, -150, 172, 270, 78, 'REVANCHA', () => { const m = this.scene.get('Match') as any; m.scene.restart(m.cfg); this.scene.restart(); }, { color: UI.orange, icon: 'retry', size: 30 }).c);
-    p.add(button(this, 150, 172, 270, 78, 'MENÚ', () => this.backToMenu(), { color: UI.blue, icon: 'home', size: 30 }).c);
+    const mcfg = (this.scene.get('Match') as any).cfg;
+    if (mcfg?.tournament) {
+      reportResult(won, d.score.a, d.score.b);
+      p.add(button(this, 0, 172, 380, 78, 'VER EL CUADRO', () => { this.scene.stop('Match'); this.scene.start('Match', { mode: 'attract', venue: mcfg.venue }); this.scene.launch('Bracket'); this.scene.stop(); }, { color: UI.orange, icon: 'trophy', size: 30 }).c);
+    } else {
+      p.add(button(this, -150, 172, 270, 78, 'REVANCHA', () => { const m = this.scene.get('Match') as any; m.scene.restart(m.cfg); this.scene.restart(); }, { color: UI.orange, icon: 'retry', size: 30 }).c);
+      p.add(button(this, 150, 172, 270, 78, 'MENÚ', () => this.backToMenu(), { color: UI.blue, icon: 'home', size: 30 }).c);
+    }
     c.add(p);
     p.setScale(0.5).setAlpha(0);
     this.tweens.add({ targets: p, scale: 1, alpha: 1, duration: 420, ease: 'Back.Out' });
@@ -619,6 +630,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   private backToMenu() {
+    clearTournament();
     this.scene.stop('Match');
     this.scene.start('Match', { mode: 'attract' });
     this.scene.launch('Menu');

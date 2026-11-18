@@ -1,13 +1,9 @@
 import Phaser from 'phaser';
 import { COURT, PHYS, RIG_SCALE, depthFor, project } from '../config';
-import { ANIM, Rig, RigData, RigInput } from './Rig';
-import rigSunJson from '../assets/rig_sun.json';
-import rigWaveJson from '../assets/rig_wave.json';
+import { ANIM, Rig, RigInput } from './Rig';
 import type { Side } from '../sports/types';
 import type { Theme } from './Ball';
-
-const rigSun = rigSunJson as unknown as RigData;
-const rigWave = rigWaveJson as unknown as RigData;
+import type { CharDef } from '../game/roster';
 
 export interface Intent {
   mx: number; // -1..1 en pantalla (derecha +)
@@ -56,12 +52,24 @@ export class Player {
   private sqV = 0;
   private lastT = 0;
 
-  constructor(scene: Phaser.Scene, public side: Side, public theme: Theme, public name: string, data?: RigData) {
+  theme: Theme;
+  name: string;
+  /** multiplicadores por estadísticas del personaje (3 = normal) */
+  speedMul = 1;
+  powerMul = 1;
+  controlBonus = 0;
+
+  constructor(scene: Phaser.Scene, public side: Side, public char: CharDef) {
     this.x = side * 5.5;
     this.z = 4;
     this.facing = -side;
+    this.theme = char.element;
+    this.name = char.name;
+    this.speedMul = 1 + (char.stats.speed - 3) * 0.06;
+    this.powerMul = 1 - (char.stats.power - 3) * 0.05; // <1 = vuelo más corto = golpe más rápido
+    this.controlBonus = (char.stats.control - 3) * 0.05;
     this.shadow = scene.add.image(0, 0, 'shadow').setDepth(98);
-    this.rig = new Rig(scene, `rig_${theme}`, data ?? (theme === 'sun' ? rigSun : rigWave));
+    this.rig = new Rig(scene, char.tex, char.data);
   }
 
   get airborne() { return this.y > 0.05; }
@@ -106,7 +114,7 @@ export class Player {
     if (len > 1) { mx /= len; mz /= len; }
 
     // velocidad: aceleración/frenada lineales muy altas => respuesta inmediata
-    const max = PHYS.playerSpeed * (this.airborne ? MOVE.airControl : 1);
+    const max = PHYS.playerSpeed * this.speedMul * (this.airborne ? MOVE.airControl : 1);
     const tx = mx * max, tz = mz * max * 0.85;
     const before = Math.hypot(this.vx, this.vz);
     const approach = (v: number, t: number) => {

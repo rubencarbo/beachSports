@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { ADS, VENUES } from '../game/venues';
 
 // Todo el arte se genera proceduralmente en canvas (cero assets descargados).
 // Se puede sustituir más adelante por sprite sheets dibujados a mano con las mismas keys.
@@ -368,6 +369,53 @@ export function generateTextures(scene: Phaser.Scene) {
     });
   }
   generateForeground(scene);
+  // arena de cada sede
+  for (const v of VENUES) {
+    canvasTex(scene, `sand_${v.id}`, 512, 512, (c, w, h) => {
+      c.fillStyle = v.sand.base;
+      c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 26; i++) {
+        c.strokeStyle = i % 2 ? v.sand.light : v.sand.dark;
+        c.lineWidth = rnd(2, 5);
+        c.beginPath();
+        const y0 = rnd(0, h), a = rnd(3, 7), f = rnd(0.01, 0.025), ph = rnd(0, 6);
+        for (let x = -10; x <= w + 10; x += 8) { const y = y0 + Math.sin(x * f + ph) * a; if (x === -10) c.moveTo(x, y); else c.lineTo(x, y); }
+        c.stroke();
+      }
+      for (let i = 0; i < 5000; i++) {
+        c.fillStyle = pick([v.sand.dark, v.sand.light, v.sand.dark]);
+        c.fillRect(rnd(0, w), rnd(0, h), rnd(1, 2.5), rnd(1, 2));
+      }
+    });
+    scene.textures.get(`sand_${v.id}`).setFilter(Phaser.Textures.FilterMode.LINEAR);
+  }
+  // vallas publicitarias (marcas ficticias)
+  for (const [key, ad] of Object.entries(ADS)) {
+    canvasTex(scene, `ad_${key}`, 360, 110, (c, w, h) => {
+      const g = c.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, ad.bg[0]); g.addColorStop(1, ad.bg[1]);
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+      c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 6; c.strokeRect(5, 5, w - 10, h - 10);
+      // icono
+      const ix = 58, iy = h / 2;
+      c.fillStyle = ad.fg; c.strokeStyle = ad.fg; c.lineWidth = 6; c.lineCap = 'round';
+      if (ad.icon === 'sun') { c.beginPath(); c.arc(ix, iy, 18, 0, 7); c.fill(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; c.beginPath(); c.moveTo(ix + Math.cos(a) * 25, iy + Math.sin(a) * 25); c.lineTo(ix + Math.cos(a) * 34, iy + Math.sin(a) * 34); c.stroke(); } }
+      else if (ad.icon === 'wave') { c.beginPath(); for (let x = -30; x <= 30; x += 3) { const y = iy + Math.sin(x * 0.18) * 10; if (x === -30) c.moveTo(ix + x, y); else c.lineTo(ix + x, y); } c.stroke(); c.beginPath(); for (let x = -30; x <= 30; x += 3) { const y = iy + 16 + Math.sin(x * 0.18 + 1) * 7; if (x === -30) c.moveTo(ix + x, y); else c.lineTo(ix + x, y); } c.stroke(); }
+      else if (ad.icon === 'paddle') { c.beginPath(); c.arc(ix + 6, iy - 8, 22, 0, 7); c.fill(); c.beginPath(); c.moveTo(ix - 8, iy + 10); c.lineTo(ix - 24, iy + 32); c.stroke(); }
+      else if (ad.icon === 'cup') { c.fillRect(ix - 20, iy - 30, 40, 30); c.fillRect(ix - 5, iy, 10, 18); c.fillRect(ix - 18, iy + 18, 36, 8); c.beginPath(); c.arc(ix - 22, iy - 18, 10, Math.PI / 2, Math.PI * 1.5); c.stroke(); c.beginPath(); c.arc(ix + 22, iy - 18, 10, -Math.PI / 2, Math.PI / 2); c.stroke(); }
+      else if (ad.icon === 'coco') { c.beginPath(); c.arc(ix, iy + 4, 26, 0, 7); c.fill(); c.fillStyle = ad.bg[1]; c.beginPath(); c.arc(ix - 8, iy - 4, 4, 0, 7); c.arc(ix + 8, iy - 4, 4, 0, 7); c.arc(ix, iy + 8, 4, 0, 7); c.fill(); }
+      else if (ad.icon === 'ice') { c.beginPath(); c.moveTo(ix - 16, iy - 4); c.lineTo(ix + 16, iy - 4); c.lineTo(ix, iy + 34); c.fill(); c.beginPath(); c.arc(ix, iy - 14, 17, 0, 7); c.fill(); }
+      else if (ad.icon === 'board') { c.beginPath(); c.ellipse(ix, iy, 13, 38, 0.5, 0, 7); c.fill(); }
+      // texto
+      c.fillStyle = ad.fg;
+      c.font = 'bold 50px "Arial Black", Impact, sans-serif';
+      c.textBaseline = 'middle';
+      const tw = c.measureText(ad.text).width;
+      const sc = Math.min(1, (w - 120) / tw);
+      c.save(); c.translate(105, h / 2 + 2); c.scale(sc, 1); c.fillText(ad.text, 0, 0); c.restore();
+    });
+    scene.textures.get(`ad_${key}`).setFilter(Phaser.Textures.FilterMode.LINEAR);
+  }
   // sombrilla y hamaca de la playa lejana
   canvasTex(scene, 'umbrella', 90, 80, (c, w, h) => {
     const cols = pick([['#ff5a5a', '#ffffff'], ['#3aa0ff', '#ffe066'], ['#ff9f1c', '#2ec4b6'], ['#7bd389', '#ffffff']]);

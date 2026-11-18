@@ -9,6 +9,7 @@ import { IconName, UI, block, button, icon, label, panel, segmented, shade } fro
 export class MenuScene extends Phaser.Scene {
   private difficulty: 'facil' | 'normal' | 'dificil' = 'normal';
   private points = 7;
+  private mode: 'friendly' | 'tournament' = 'friendly';
   private root!: Phaser.GameObjects.Container;
 
   constructor() { super('Menu'); }
@@ -68,36 +69,41 @@ export class MenuScene extends Phaser.Scene {
     const px = w - pw / 2 - 30, py = h / 2 + 10;
     const p = panel(this, px, py, pw, ph, { wood: true, title: 'NUEVO PARTIDO', titleColor: UI.orange });
     c.add(p);
-    let y = -ph / 2 + 64;
-    p.add(label(this, -pw / 2 + 30, y, 'DEPORTE', 26, '#fff3d6').setOrigin(0, 0.5));
-    y += 66;
+    let y = -ph / 2 + 58;
+    p.add(label(this, -pw / 2 + 30, y, 'DEPORTE', 24, '#fff3d6').setOrigin(0, 0.5));
+    y += 52;
     const cw = (pw - 60) / 3;
     const icons: IconName[] = ['paddle', 'volley', 'foot'];
     SPORTS.forEach((s, i) => {
       const cx = -pw / 2 + 30 + cw * i + cw / 2;
       const card = this.add.graphics();
-      block(card, cx - cw / 2 + 4, y - 46, cw - 8, 108, s.available ? UI.teal : 0x55607e);
-      icon(card, icons[i], cx, y - 12, 48, s.available ? UI.cream : 0xb8c0d4);
+      block(card, cx - cw / 2 + 4, y - 34, cw - 8, 76, s.available ? UI.teal : 0x55607e);
+      icon(card, icons[i], cx - cw * 0.28, y + 4, 34, s.available ? UI.cream : 0xb8c0d4);
       p.add(card);
-      p.add(label(this, cx, y + 36, s.name, 20, s.available ? '#fff3d6' : '#c8cfe0'));
+      p.add(label(this, cx + 18, y + 4, s.name, 17, s.available ? '#fff3d6' : '#c8cfe0', { wordWrap: { width: cw * 0.6 }, align: 'center' }));
       if (!s.available) {
         const lk = this.add.graphics();
-        block(lk, cx + cw / 2 - 50, y - 60, 44, 38, UI.ink, { shadow: false });
-        icon(lk, 'lock', cx + cw / 2 - 28, y - 41, 26, UI.yellow);
+        block(lk, cx + cw / 2 - 44, y - 46, 38, 32, UI.ink, { shadow: false });
+        icon(lk, 'lock', cx + cw / 2 - 25, y - 30, 22, UI.yellow);
         p.add(lk);
       }
     });
-    y += 104;
-    p.add(label(this, -pw / 2 + 30, y, 'DIFICULTAD', 26, '#fff3d6').setOrigin(0, 0.5));
-    y += 54;
+    y += 74;
+    p.add(label(this, -pw / 2 + 30, y, 'MODO', 24, '#fff3d6').setOrigin(0, 0.5));
+    y += 44;
+    p.add(segmented(this, 0, y, pw - 60, 58, ['AMISTOSO', 'TORNEO (8)'], this.mode === 'friendly' ? 0 : 1, (i) => { this.mode = i === 0 ? 'friendly' : 'tournament'; this.build(); }, UI.orange));
+    y += 60;
+    p.add(label(this, -pw / 2 + 30, y, 'DIFICULTAD', 24, '#fff3d6').setOrigin(0, 0.5));
+    y += 44;
     const levels: ('facil' | 'normal' | 'dificil')[] = ['facil', 'normal', 'dificil'];
-    p.add(segmented(this, 0, y, pw - 60, 62, ['FÁCIL', 'NORMAL', 'DIFÍCIL'], levels.indexOf(this.difficulty), (i) => { this.difficulty = levels[i]; }, UI.teal));
-    y += 72;
-    p.add(label(this, -pw / 2 + 30, y, 'PUNTOS', 26, '#fff3d6').setOrigin(0, 0.5));
-    y += 54;
+    if (this.mode === 'friendly') p.add(segmented(this, 0, y, pw - 60, 58, ['FÁCIL', 'NORMAL', 'DIFÍCIL'], levels.indexOf(this.difficulty), (i) => { this.difficulty = levels[i]; }, UI.teal));
+    else p.add(label(this, 0, y, 'SUBE EN CADA RONDA: FÁCIL → NORMAL → DIFÍCIL', 20, '#ffd23f'));
+    y += 60;
+    p.add(label(this, -pw / 2 + 30, y, 'PUNTOS', 24, '#fff3d6').setOrigin(0, 0.5));
+    y += 44;
     const pts = [5, 7, 11];
-    p.add(segmented(this, 0, y, pw - 60, 62, pts.map((n) => `A ${n}`), pts.indexOf(this.points), (i) => { this.points = pts[i]; }, UI.teal));
-    const play = button(this, 0, ph / 2 - 64, pw - 70, 92, '¡JUGAR!', () => this.start(), { color: UI.orange, icon: 'play', size: 42 });
+    p.add(segmented(this, 0, y, pw - 60, 58, pts.map((n) => `A ${n}`), pts.indexOf(this.points), (i) => { this.points = pts[i]; }, UI.teal));
+    const play = button(this, 0, ph / 2 - 56, pw - 70, 82, this.mode === 'tournament' ? '¡AL TORNEO!' : '¡JUGAR!', () => this.start(), { color: UI.orange, icon: 'play', size: 42 });
     p.add(play.c);
     this.tweens.add({ targets: play.c, scale: 1.04, yoyo: true, repeat: -1, duration: 650, ease: 'Sine.InOut' });
 
@@ -120,11 +126,8 @@ export class MenuScene extends Phaser.Scene {
     const el = document.documentElement as any;
     if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {});
     (screen.orientation as any)?.lock?.('landscape').catch?.(() => {});
-    this.scene.stop('Match');
-    this.scene.start('Match', { mode: 'play', difficulty: this.difficulty, points: this.points });
-    // datos explícitos: si no, Phaser reutiliza los del último lanzamiento (p. ej. modo edición de ajustes)
-    this.scene.launch('Hud', { edit: false, standalone: false });
-    this.scene.bringToTop('Hud');
+    // elegir personaje (la partida de demostración sigue de fondo)
+    this.scene.launch('Select', { mode: this.mode, difficulty: this.difficulty, points: this.points });
     this.scene.stop();
   }
 }

@@ -11,6 +11,7 @@ import rigWaveJson from '../assets/rig_wave.json';
 import crowdUrl from '../assets/crowd.png';
 import crowdJson from '../assets/crowd.json';
 import { RigData, registerRigFrames } from '../entities/Rig';
+import { buildRoster } from '../game/roster';
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
@@ -27,13 +28,14 @@ export class BootScene extends Phaser.Scene {
     registerRigFrames(this, 'rig_sun', rigSunJson as unknown as RigData);
     registerRigFrames(this, 'rig_wave', rigWaveJson as unknown as RigData);
     registerRigFrames(this, 'crowd', crowdJson as unknown as RigData);
-    const go = () => {
+    const go0 = () => {
       if (location.hash === '#lab') { this.scene.start('Lab'); return; }
       this.scene.start('Match', { mode: 'attract' });
       this.scene.launch('Menu');
     };
     // espera a la fuente (si está disponible) para que los textos salgan bien
     const fonts = (document as any).fonts;
+    const go = () => { buildRoster(this).then(go0, go0); };
     if (fonts?.load) Promise.race([Promise.all([fonts.load('16px "Press Start 2P"'), fonts.load('bold 16px "Pixelify Sans"')]), new Promise((r) => setTimeout(r, 2000))]).then(go, go);
     else go();
   }

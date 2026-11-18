@@ -4,6 +4,7 @@ import { sfx } from '../core/audio';
 import { PIXEL_FONT as FONT } from '../core/fonts';
 import { Intent, MOVE, Player, SWING_TIMES } from '../entities/Player';
 import { ANIM } from '../entities/Rig';
+import { getChar } from '../game/roster';
 
 type Anim = 'guardia' | 'correr' | 'atras' | 'derecha' | 'remate' | 'saque' | 'salto' | 'celebrar' | 'lamento' | 'aturdida';
 
@@ -30,7 +31,7 @@ export class LabScene extends Phaser.Scene {
     const ground = project(0, 0, 2);
     this.add.rectangle(STAGE_CX, ground.y + 200, 4000, 400, 0xf9d27a);
     this.add.rectangle(STAGE_CX, ground.y, 4000, 3, 0xd8a850);
-    this.players = [new Player(this, -1, 'sun', 'SOL'), new Player(this, 1, 'wave', 'OLA')];
+    this.players = [new Player(this, -1, getChar('sol')), new Player(this, 1, getChar('ola'))];
     this.players[0].x = -1.6; this.players[1].x = 1.6;
     for (const p of this.players) p.z = 2;
     cam.setZoom(2.4 * (this.scale.height / 720));

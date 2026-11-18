@@ -8,6 +8,8 @@ import { getSettings } from '../core/settings';
 import { Ball, ShotKind } from '../entities/Ball';
 import { Intent, Player } from '../entities/Player';
 import { DEPTH, computeShot } from '../entities/shots';
+import { getChar, randomChar } from '../game/roster';
+import { VENUES, Venue, getVenue } from '../game/venues';
 import { CAM_BASE_Y, CameraDirector } from '../fx/CameraDirector';
 import { Effects } from '../fx/Effects';
 import { saveMatch } from '../services/backend';
@@ -19,6 +21,10 @@ export interface MatchConfig {
   mode: 'play' | 'attract';
   difficulty: keyof typeof AI_LEVELS;
   points: number;
+  p1?: string; // id del personaje (jugadora humana, izquierda)
+  p2?: string; // rival
+  venue?: string; // sede
+  tournament?: boolean;
 }
 
 type State = 'serve' | 'rally' | 'point' | 'over';
@@ -55,7 +61,10 @@ export class MatchScene extends Phaser.Scene {
   constructor() { super('Match'); }
 
   init(data: Partial<MatchConfig>) {
-    this.cfg = { mode: data.mode ?? 'attract', difficulty: data.difficulty ?? 'normal', points: data.points ?? 7 };
+    this.cfg = { mode: data.mode ?? 'attract', difficulty: data.difficulty ?? 'normal', points: data.points ?? 7, p1: data.p1, p2: data.p2, venue: data.venue, tournament: data.tournament };
+    if (!this.cfg.p1) this.cfg.p1 = this.cfg.mode === 'attract' ? randomChar().id : 'sol';
+    if (!this.cfg.p2) this.cfg.p2 = randomChar([this.cfg.p1]).id;
+    if (!this.cfg.venue) this.cfg.venue = this.cfg.mode === 'attract' ? VENUES[Math.floor(Math.random() * VENUES.length)].id : 'mediodia';
     this.rules = beachPaddle(this.cfg.points);
     this.score = { [-1]: 0, [1]: 0 } as Record<Side, number>;
     this.ai = new Map();
@@ -64,11 +73,12 @@ export class MatchScene extends Phaser.Scene {
   }
 
   create() {
-    this.stage = new BeachStage(this);
+    this.venue = getVenue(this.cfg.venue);
+    this.stage = new BeachStage(this, this.venue);
     this.stage.buildNet();
     this.ball = new Ball(this);
-    this.p1 = new Player(this, -1, 'sun', this.cfg.mode === 'play' ? 'TU' : 'SOL');
-    this.p2 = new Player(this, 1, 'wave', 'CPU');
+    this.p1 = new Player(this, -1, getChar(this.cfg.p1));
+    this.p2 = new Player(this, 1, getChar(this.cfg.p2));
     const lvl = AI_LEVELS[this.cfg.difficulty];
     if (this.cfg.mode === 'attract') this.ai.set(-1, new AiController(this.p1, AI_LEVELS.dificil));
     this.ai.set(1, new AiController(this.p2, this.cfg.mode === 'attract' ? AI_LEVELS.dificil : lvl));
@@ -79,6 +89,9 @@ export class MatchScene extends Phaser.Scene {
     if (this.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer) {
       this.cameras.main.setPostPipeline(GradePipeline);
       this.grade = this.cameras.main.getPostPipeline(GradePipeline) as GradePipeline;
+      this.grade.tint = [...this.venue.grade.tint] as [number, number, number];
+      this.grade.sunset = this.venue.grade.sunset;
+      this.grade.glow = this.venue.grade.glow;
     }
     this.stage.setScore(0, 0);
     this.setupServe(Math.random() < 0.5 ? -1 : 1);
@@ -385,7 +398,7 @@ export class MatchScene extends Phaser.Scene {
     const ai = this.ai.get(p.side);
     const aimZ = ai ? ai.wantShot.aimZ : Math.abs(playerInput.my) > 0.3 ? (playerInput.my + 1) / 2 : Math.random();
     const from = { x: this.ball.x, y: Math.max(1.2, this.ball.y), z: this.ball.z };
-    const v = computeShot(from, p.side, 'serve', aimZ, quality, 1 - 0.36 * power);
+    const v = computeShot(from, p.side, 'serve', aimZ, Phaser.Math.Clamp(quality + p.controlBonus, 0, 1), (1 - 0.36 * power) * p.powerMul);
     this.ball.launch(v.vx, v.vy, v.vz, p.side, 'serve', p.theme);
     this.state = 'rally';
     this.serveTimer = -1;
@@ -398,6 +411,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private grade?: GradePipeline;
+  venue!: Venue;
   private stepIdx: Record<number, number> = {};
 
   /** Huellas en la arena al correr (se desvanecen poco a poco). */
@@ -587,7 +601,7 @@ export class MatchScene extends Phaser.Scene {
     const special = p.powered;
     if (special) kind = 'special';
 
-    const v = computeShot({ x: b.x, y: b.y, z: b.z }, p.side, kind, aimZ, special ? 1 : q);
+    const v = computeShot({ x: b.x, y: b.y, z: b.z }, p.side, kind, aimZ, special ? 1 : Phaser.Math.Clamp(q + p.controlBonus, 0, 1), special ? 1 : p.powerMul);
     b.launch(v.vx, v.vy, v.vz, p.side, kind, p.theme);
     this.rallyHits++;
     if (this.rallyHits >= 4) {

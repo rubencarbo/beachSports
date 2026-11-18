@@ -7,6 +7,9 @@ import { MatchScene } from './scenes/MatchScene';
 import { MenuScene } from './scenes/MenuScene';
 import { SettingsScene } from './scenes/SettingsScene';
 import { LabScene } from './scenes/LabScene';
+import { SelectScene } from './scenes/SelectScene';
+import { BracketScene } from './scenes/BracketScene';
+import { CharStudioScene } from './scenes/CharStudioScene';
 import { initBackend } from './services/backend';
 import { GradePipeline, RetroPipeline } from './fx/RetroPipeline';
 
@@ -25,7 +28,7 @@ const game = new Phaser.Game({
   pipeline: { RetroPipeline, GradePipeline } as any,
   fps: { target: 60 },
   input: { activePointers: 4 },
-  scene: [BootScene, MatchScene, MenuScene, HudScene, SettingsScene, LabScene],
+  scene: [BootScene, MatchScene, MenuScene, HudScene, SettingsScene, LabScene, SelectScene, BracketScene, CharStudioScene],
 });
 
 initBackend();
@@ -36,3 +39,5 @@ document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: fal
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 (window as any).__game = game;
 (window as any).__inp = playerInput;
+import { getTournament } from './game/tournament';
+(window as any).__tour = getTournament;
