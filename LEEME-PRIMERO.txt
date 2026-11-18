@@ -1,0 +1,38 @@
+BEACH SPORTS · CÓMO PUBLICARLO (modo fácil)
+===========================================
+
+El juego YA ESTÁ CONSTRUIDO (carpeta "dist") y configurado con tu proyecto
+de Firebase "beachsportscubelles". Sólo hay que subirlo.
+
+PASO 1 · Instalar Node.js (una sola vez)
+  Entra en https://nodejs.org , pulsa el botón verde "LTS", instálalo
+  dándole a "Siguiente" en todo.
+
+PASO 2 · Publicar
+  Descomprime este zip en una carpeta de tu PC (por ejemplo el Escritorio).
+  - Windows: doble clic en  desplegar.bat
+      (si Windows avisa "protegió su PC": "Más información" > "Ejecutar de todas formas")
+  - Mac: clic derecho en  desplegar.command  > Abrir > Abrir
+  Se abrirá el navegador: entra con la MISMA cuenta de Google con la que
+  creaste el proyecto en Firebase y acepta. Vuelve a la ventana negra y espera
+  a que diga "LISTO" (1-3 minutos; la primera vez tarda algo más).
+
+PASO 3 · Jugar en el móvil
+  Abre  https://beachsportscubelles.web.app  en el móvil.
+  - iPhone (Safari): botón Compartir > "Añadir a pantalla de inicio".
+  - Android (Chrome): menú ⋮ > "Instalar aplicación".
+  Ponlo en horizontal. Después funciona incluso sin conexión.
+
+PASO 4 · Jugar en la TrimUI
+  Abre  https://beachsportscubelles.web.app/trimui/  y sigue los pasos
+  (activar Wi-Fi y SSH en la consola, conectarte y pegar un comando).
+
+OPCIONAL · Guardar partidas en la nube
+  En https://console.firebase.google.com > tu proyecto:
+  - Compilación > Authentication > Comenzar > "Anónimo" > Habilitar.
+  - Compilación > Firestore Database > Crear base de datos > modo producción.
+  Luego vuelve a hacer el PASO 2 (sube las reglas de seguridad).
+  Sin esto el juego funciona igual; sólo no guarda estadísticas.
+
+PARA ACTUALIZAR EL JUEGO MÁS ADELANTE
+  Repite el PASO 2 con el zip nuevo que te pase.

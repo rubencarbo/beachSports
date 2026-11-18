@@ -42,6 +42,10 @@
   <div class="card">
     <p>Pega este comando en la terminal de la consola:</p>
     <pre id="cmd">curl -fsSL __URL__/instalar.sh | bash</pre>
+    <script>
+      // el comando se calcula con la dirección real de esta página: vale para cualquier proyecto de Firebase
+      if (location.protocol.startsWith("http")) { const base = location.origin + location.pathname.replace(/\/(index\.html)?$/, ""); document.getElementById("cmd").textContent = "curl -fsSL " + base + "/instalar.sh | JUEGO_URL=" + base + " bash"; }
+    </script>
     <button onclick="navigator.clipboard.writeText(document.getElementById('cmd').textContent).then(()=>this.textContent='¡Copiado!')">Copiar comando</button>
     <p class="muted">Si la consola no tiene jsgamelauncher, el instalador lo instala (5-10 minutos, no la apagues). Para actualizar el juego, repite este paso.</p>
   </div>
