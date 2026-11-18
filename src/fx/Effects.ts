@@ -114,6 +114,9 @@ export class Effects {
   }
 
   floatText(x: number, y: number, text: string, color = '#ffffff', size = 34) {
+    const wv = this.scene.cameras.main.worldView;
+    const half = Math.min(wv.width * 0.3, text.length * size * 0.32);
+    if (wv.width > 0) x = Phaser.Math.Clamp(x, wv.x + half, wv.right - half);
     const t = this.scene.add.text(x, y, text, {
       fontFamily: PIXEL_FONT, fontSize: `${Math.round(size * 0.6)}px`, color,
       stroke: '#1a1020', strokeThickness: 6,

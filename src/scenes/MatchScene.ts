@@ -24,6 +24,8 @@ export interface MatchConfig {
 type State = 'serve' | 'rally' | 'point' | 'over';
 
 const SPECIAL_NAME = { sun: '¡METEORO SOLAR!', wave: '¡TSUNAMI!' };
+/** velocidad vertical del lanzamiento de saque (bola hasta ~2,9 m) */
+const SERVE_VY = 6.6;
 
 export class MatchScene extends Phaser.Scene {
   cfg!: MatchConfig;
@@ -93,6 +95,7 @@ export class MatchScene extends Phaser.Scene {
 
   private setupServe(server: Side) {
     this.game.events.emit('rally', 0);
+    this.game.events.emit('serve-meter', { phase: 'hide' });
     if (this.cfg.mode === 'play' && this.matchPoint()) this.time.delayedCall(300, () => this.game.events.emit('banner', '¡PUNTO DE PARTIDO!'));
     this.server = server;
     this.state = 'serve';
@@ -237,6 +240,7 @@ export class MatchScene extends Phaser.Scene {
       if (it.special) this.activateSpecial(p);
       if (it.hit) {
         if (serving && this.ball.held && this.serveTimer < 0) this.startServe(p);
+        else if (serving && this.ball.held && this.serveTimer >= 0.12 && !this.ai.has(p.side)) this.hitServe(p);
         else if (this.state === 'rally' && p.swingT >= 0.7) {
           const plan = this.ai.has(p.side) ? null : this.humanPlan;
           if (plan && plan.smash && !p.airborne && getSettings().autoSmash) {
@@ -247,7 +251,7 @@ export class MatchScene extends Phaser.Scene {
             p.lastBallDist = 99;
             this.pressLead = plan ? plan.t : 0.12;
             // con asistencia el golpe espera a la bola (la calidad depende del momento de pulsar)
-            if (plan && getSettings().assist) p.hitBuffer = Math.min(0.6, plan.t + 0.15);
+            if (plan && getSettings().movement !== 'manual') p.hitBuffer = Math.min(0.6, plan.t + 0.15);
             p.startSwing(p.airborne && this.ball.y > 1.9 ? 'over' : 'fore');
             sfx.whoosh();
           }
@@ -265,9 +269,25 @@ export class MatchScene extends Phaser.Scene {
       if (this.serveTimer >= 0) {
         this.serveTimer += dt;
         const t = this.serveTimer;
+        // lanzamiento real de la bola: sube hasta ~2,9 m y vuelve a la mano en ~1,15 s
         this.ball.x = s.x + s.facing * 0.35; this.ball.z = s.z - 0.1;
-        this.ball.y = 1.0 + Math.sin(Math.min(1, t / 0.5) * Math.PI * 0.8) * 1.6;
-        if (t > 0.42) this.launchServe(s);
+        this.ball.y = 1.0 + SERVE_VY * t - 0.5 * PHYS.gravity * t * t;
+        const v = this.serveMeter();
+        const human = !this.ai.has(s.side);
+        if (human) this.game.events.emit('serve-meter', { phase: 'run', v });
+        else if (t > 0.3 && (this.prevMeter - this.aiServeTarget) * (v - this.aiServeTarget) <= 0) this.hitServe(s);
+        this.prevMeter = v;
+        if (this.state === 'serve' && this.ball.y < 1.0 && t > 0.3) {
+          // no ha golpeado: recoge la bola y se repite sin penalización
+          this.serveTimer = -1;
+          s.stage = 'none';
+          this.ai.get(s.side)?.resetServe();
+          if (human) {
+            this.game.events.emit('serve-meter', { phase: 'hide' });
+            const sp = project(s.x, 2.4, s.z);
+            this.fx.floatText(sp.x, sp.y - 40, '¡OTRA VEZ!', '#ffffff', 34);
+          }
+        }
       } else {
         this.ball.x = s.x + s.facing * 0.35; this.ball.y = 0.95 + Math.sin(this.now * 3) * 0.05; this.ball.z = s.z - 0.1;
       }
@@ -319,26 +339,62 @@ export class MatchScene extends Phaser.Scene {
 
   private lastWinnerSide: Side = -1;
 
-  private startServe(p: Player) {
-    this.serveTimer = 0;
-    p.startSwing('serve');
+  private aiServeTarget = 0.9;
+  private prevMeter = 0;
+
+  /** Barra del saque: va y viene de 0 a 1 (periodo 0,9 s) desde que se lanza la bola. */
+  private serveMeter() {
+    const ph = this.serveTimer / 0.45;
+    const f = ph % 1;
+    return Math.floor(ph) % 2 === 0 ? f : 1 - f;
   }
 
-  private launchServe(p: Player) {
+  /** Primer toque: lanzar la bola al aire. */
+  private startServe(p: Player) {
+    this.serveTimer = 0;
+    this.prevMeter = 0;
+    p.startSwing('serve');
+    sfx.whoosh();
+    // la máquina apunta a la zona verde con más o menos puntería según la dificultad
+    const sigma = this.cfg.difficulty === 'facil' ? 0.2 : this.cfg.difficulty === 'dificil' ? 0.05 : 0.11;
+    const g = (Math.random() + Math.random() + Math.random() - 1.5) * 1.4;
+    this.aiServeTarget = Phaser.Math.Clamp(0.9 + g * sigma, 0.2, 0.995);
+  }
+
+  /** Segundo toque: golpear. La barra decide potencia y precisión; también cuenta la altura de la bola. */
+  private hitServe(p: Player) {
+    const v = this.serveMeter();
+    let zone: 'perfect' | 'good' | 'weak' | 'over';
+    let q: number, pow: number;
+    if (v > 0.97) { zone = 'over'; q = 0.28; pow = 1; }
+    else if (v >= 0.82) { zone = 'perfect'; q = 1; pow = 1; }
+    else if (v >= 0.6) { zone = 'good'; q = 0.82; pow = 0.65; }
+    else { zone = 'weak'; q = 0.62; pow = 0.3; }
+    if (this.ball.y < 2.0) q *= 0.75; // dejó caer demasiado la bola
+    this.launchServe(p, q, pow);
+    if (!this.ai.has(p.side)) {
+      this.game.events.emit('serve-meter', { phase: 'done', v, zone });
+      const sp = project(p.x, 2.6, p.z);
+      const txt = { perfect: '¡SAQUE PERFECTO!', good: '¡BUEN SAQUE!', weak: 'SAQUE FLOJO', over: '¡DEMASIADO FUERTE!' }[zone];
+      this.fx.floatText(sp.x, sp.y - 50, txt, zone === 'perfect' ? '#ffe14d' : zone === 'over' ? '#ff8a6a' : '#ffffff', zone === 'perfect' ? 36 : 30);
+      if (zone === 'perfect') { this.stats.perfects++; this.dir.kick(0.04); }
+    }
+  }
+
+  private launchServe(p: Player, quality = 0.92, power = 0.6) {
     const ai = this.ai.get(p.side);
     const aimZ = ai ? ai.wantShot.aimZ : Math.abs(playerInput.my) > 0.3 ? (playerInput.my + 1) / 2 : Math.random();
-    const from = { x: this.ball.x, y: 2.3, z: this.ball.z };
-    this.ball.y = 2.3;
-    const v = computeShot(from, p.side, 'serve', aimZ, 0.92);
+    const from = { x: this.ball.x, y: Math.max(1.2, this.ball.y), z: this.ball.z };
+    const v = computeShot(from, p.side, 'serve', aimZ, quality, 1 - 0.36 * power);
     this.ball.launch(v.vx, v.vy, v.vz, p.side, 'serve', p.theme);
     this.state = 'rally';
     this.serveTimer = -1;
     this.rallyHits = 1;
     p.contact('serve', true);
     { const sp = project(p.x, 2, p.z); this.fx.swoosh(sp.x, sp.y, p.facing, true, sp.k, null); }
-    sfx.hit(0.6);
+    sfx.hit(0.4 + power * 0.5);
     const bp = this.ball.screenPos();
-    this.fx.hitSpark(bp.x, bp.y);
+    this.fx.hitSpark(bp.x, bp.y, power > 0.9);
   }
 
   private grade?: GradePipeline;
@@ -375,7 +431,22 @@ export class MatchScene extends Phaser.Scene {
     this.humanPlan = this.state === 'rally' && b.live && !b.held && b.lastHitter !== p.side ? planIntercept(b, p, st.autoSmash) : null;
     // asistido: mientras viene la bola la cruceta SÓLO apunta (la jugadora va sola al punto de golpeo);
     // con la bola alejándose, la cruceta mueve libremente y, si no se toca, vuelve a su posición
-    if (st.assist && this.state === 'rally' && (this.humanPlan || Math.hypot(it.mx, it.mz) < 0.55)) {
+    if (st.movement === 'semi' && this.state === 'rally' && this.humanPlan) {
+      // semiasistido: te mueves tú; cerca del punto de golpeo un "imán" te coloca
+      const plan = this.humanPlan;
+      const dx = plan.x - p.x, dz = plan.z - p.z;
+      const dist = Math.hypot(dx, dz);
+      const R = 2.6;
+      if (dist > 0.08 && dist < R) {
+        const stick = Math.hypot(it.mx, it.mz);
+        const pull = stick < 0.3 ? Math.min(1, dist / 0.5) : 0.35 + 0.45 * (1 - dist / R);
+        let mx = (stick < 0.3 ? 0 : it.mx) + (dx / dist) * pull;
+        let mz = (stick < 0.3 ? 0 : it.mz) + ((dz / dist) * pull) / 0.85;
+        const l = Math.hypot(mx, mz);
+        if (l > 1) { mx /= l; mz /= l; }
+        it.mx = mx; it.mz = mz;
+      }
+    } else if (st.movement === 'assist' && this.state === 'rally' && (this.humanPlan || Math.hypot(it.mx, it.mz) < 0.55)) {
       const tgt = this.humanPlan ?? { x: p.side * 5.2, z: 4 + (b.z - 4) * 0.35 };
       const dx = tgt.x - p.x, dz = tgt.z - p.z;
       const dist = Math.hypot(dx, dz);
@@ -484,7 +555,7 @@ export class MatchScene extends Phaser.Scene {
     const ai = this.ai.get(p.side);
     let q = Phaser.Math.Clamp(0.3 + 0.75 * (1 - d / PHYS.reach), 0, 1);
     if (ai) q = ai.qualityRoll;
-    else if (getSettings().assist) {
+    else if (getSettings().movement !== 'manual') {
       // calidad por el momento de pulsar: ideal ~0,12 s antes del contacto (el anillo se pone verde)
       const timing = Phaser.Math.Clamp(1 - Math.abs(this.pressLead - 0.12) / 0.4, 0, 1);
       q = Phaser.Math.Clamp(0.25 + 0.75 * timing, 0, 1);

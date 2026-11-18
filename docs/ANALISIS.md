@@ -104,7 +104,21 @@ Comparación del mismo fotograma a 848×528:
   - marcador de madera
   - sombrillas cercanas
 
-## 11. Siguientes pasos
+## 11. Público ilustrado, movimiento semiasistido y saque en dos toques
+- **Público** (`art/sheets/crowd.json` → `src/assets/crowd.png`): 8 espectadores en dos poses (tranquilo y animando) y un perro (sentado y ladrando), en dos filas tras el cordón rojo.
+  - El croma de esta hoja es más estricto, para no borrar la ropa verde.
+  - La limpieza de restos de verde actúa solo en el contorno.
+- **Movimiento** (`settings.movement`):
+  - `assist`: corre sola a la bola y la cruceta solo apunta.
+  - `semi`: te mueves tú y, a menos de 2,6 m del punto de golpeo, un imán te coloca; si sueltas la cruceta, da el último paso sola.
+  - `manual`: sin ayuda.
+- **Saque en dos toques:**
+  - El 1.º toque lanza la bola (sube ~1,9 m y cae en ~1,15 s) y arranca una barra que va y viene cada 0,9 s.
+  - El 2.º toque golpea. Zonas de la barra: flojo (<0,6), bueno (0,6–0,82), **perfecto** (0,82–0,97) y pasado (>0,97, muy potente pero impreciso).
+  - La potencia acorta el vuelo hasta un 36 %. Golpear la bola por debajo de 2 m resta calidad. Si no golpeas, se repite.
+  - La máquina usa la misma barra, con una dispersión según la dificultad.
+
+## 12. Siguientes pasos
 1. Multijugador online 1 vs 1 con Firebase Realtime Database (más baja latencia que Firestore). Modelo autoritativo del que saca, enviando solo los eventos de golpe (posición + velocidad), ya que la trayectoria es determinista.
 2. Vóley playa: `touchesPerSide: 3` y controles de recepción, colocación y remate. Futvóley: mismos toques usando el cuerpo. El escenario, la cámara, los efectos y el público se reutilizan tal cual.
 3. Arte final en sprite sheets, música, ranking global y personajes desbloqueables.

@@ -29,6 +29,8 @@ export class AiController {
 
   constructor(public me: Player, public skill: AiSkill) {}
 
+  resetServe() { this.serveDelay = 0.5; }
+
   think(dt: number, ball: Ball, opp: Player, servingMe: boolean): Intent {
     const me = this.me;
     const it: Intent = { mx: 0, mz: 0, hit: false, jump: false, special: false };
@@ -36,7 +38,7 @@ export class AiController {
     if (servingMe && ball.held) {
       // al sacar: espera un instante, se recoloca y saca
       this.serveDelay += dt;
-      if (this.serveDelay > 1.1) { it.hit = true; this.serveDelay = 0; this.pickShot(opp); }
+      if (this.serveDelay > 1.1 && this.serveDelay < 9) { it.hit = true; this.serveDelay = 9; this.pickShot(opp); }
       return it;
     }
     this.serveDelay = 0;

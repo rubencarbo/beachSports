@@ -78,13 +78,14 @@ export class HudScene extends Phaser.Scene {
     const onEditOff = () => this.setEdit(false);
     const onRally = (n: number) => this.onRally(n);
     const onBanner = (t: string) => this.banner(t);
+    const onServeMeter = (d: { phase: 'run' | 'done' | 'hide'; v?: number; zone?: string }) => this.serveMeterUi(d);
     const onSettingsClosed = () => this.showPause();
     ev.on('hud', onHud); ev.on('point', onPoint); ev.on('match-over', onOver); ev.on('face', onFace);
-    ev.on('hud-edit', onEdit); ev.on('hud-settings-closed', onSettingsClosed); ev.on('hud-edit-end', onEditEnd); ev.on('hud-edit-off', onEditOff); ev.on('rally', onRally); ev.on('banner', onBanner);
+    ev.on('hud-edit', onEdit); ev.on('hud-settings-closed', onSettingsClosed); ev.on('hud-edit-end', onEditEnd); ev.on('hud-edit-off', onEditOff); ev.on('rally', onRally); ev.on('banner', onBanner); ev.on('serve-meter', onServeMeter);
     const offSettings = onSettings(() => this.layout());
     this.events.once('shutdown', () => {
       ev.off('hud', onHud); ev.off('point', onPoint); ev.off('match-over', onOver); ev.off('face', onFace);
-      ev.off('hud-edit', onEdit); ev.off('hud-settings-closed', onSettingsClosed); ev.off('hud-edit-end', onEditEnd); ev.off('hud-edit-off', onEditOff); ev.off('rally', onRally); ev.off('banner', onBanner); offSettings();
+      ev.off('hud-edit', onEdit); ev.off('hud-settings-closed', onSettingsClosed); ev.off('hud-edit-end', onEditEnd); ev.off('hud-edit-off', onEditOff); ev.off('rally', onRally); ev.off('banner', onBanner); ev.off('serve-meter', onServeMeter); offSettings();
     });
     applyRetro(this.cameras.main, 2000);
     this.scale.on('resize', this.layout, this);
@@ -95,6 +96,58 @@ export class HudScene extends Phaser.Scene {
     let seen = false;
     try { seen = localStorage.getItem('beachsports.tutorial') === '1'; } catch { /* sin almacenamiento */ }
     if (!this.standalone && !this.edit && !seen) this.time.delayedCall(700, () => this.startTutorial());
+  }
+
+  // ------------------------------------------------------------ barra del saque (dos toques)
+  private meterUi?: Phaser.GameObjects.Container;
+  private meterMark?: Phaser.GameObjects.Graphics;
+  private meterActive = false;
+  private static readonly ZONES: [number, number, number, string][] = [
+    [0, 0.6, 0xc4602a, 'FLOJO'], [0.6, 0.82, UI.yellow, 'BUENO'], [0.82, 0.97, UI.green, 'PERFECTO'], [0.97, 1, UI.red, ''],
+  ];
+  private serveMeterUi(d: { phase: 'run' | 'done' | 'hide'; v?: number; zone?: string }) {
+    const w = this.scale.width, h = this.scale.height;
+    const BW = Math.min(620, w * 0.42), BH = 38;
+    if (d.phase === 'hide') {
+      this.meterActive = false;
+      if (this.meterUi) { const m = this.meterUi; this.meterUi = undefined; this.tweens.add({ targets: m, alpha: 0, duration: 200, onComplete: () => m.destroy() }); }
+      return;
+    }
+    if (!this.meterUi) {
+      const c = this.add.container(w / 2, h - 175).setDepth(42);
+      const g = this.add.graphics();
+      block(g, -BW / 2 - 14, -BH / 2 - 40, BW + 28, BH + 58, UI.inkSoft);
+      for (const [a, b, col] of HudScene.ZONES) {
+        g.fillStyle(col, 1).fillRect(-BW / 2 + a * BW, -BH / 2, (b - a) * BW, BH);
+        g.fillStyle(shade(col, 1.3), 1).fillRect(-BW / 2 + a * BW, -BH / 2, (b - a) * BW, 6);
+      }
+      g.lineStyle(4, UI.ink, 1).strokeRect(-BW / 2, -BH / 2, BW, BH);
+      c.add(g);
+      c.add(label(this, -BW / 2 + 10, -BH / 2 - 20, 'POTENCIA', 22).setOrigin(0, 0.5));
+      c.add(label(this, -BW / 2 + 0.895 * BW, -BH / 2 - 20, 'PERFECTO', 18, '#8dff8a'));
+      this.meterMark = this.add.graphics();
+      c.add(this.meterMark);
+      c.setScale(0.6).setAlpha(0);
+      this.tweens.add({ targets: c, scale: 1, alpha: 1, duration: 160, ease: 'Back.Out' });
+      this.meterUi = c;
+    }
+    const v = d.v ?? 0;
+    const mx = -BW / 2 + v * BW;
+    const m = this.meterMark!;
+    m.clear();
+    m.fillStyle(UI.ink, 1).fillRect(mx - 5, -BH / 2 - 8, 10, BH + 16);
+    m.fillStyle(0xffffff, 1).fillRect(mx - 3, -BH / 2 - 6, 6, BH + 12);
+    m.fillStyle(0xffffff, 1).fillTriangle(mx - 12, -BH / 2 - 22, mx + 12, -BH / 2 - 22, mx, -BH / 2 - 8);
+    if (d.phase === 'run') {
+      this.meterActive = true;
+      this.hint.setText(this.touch ? '¡GOLPE en la zona VERDE!' : '¡J o ESPACIO en la zona VERDE!');
+    } else {
+      this.meterActive = false;
+      this.hint.setText('');
+      const ui = this.meterUi!;
+      this.tweens.add({ targets: ui, scale: 1.12, duration: 90, yoyo: true });
+      this.time.delayedCall(900, () => this.serveMeterUi({ phase: 'hide' }));
+    }
   }
 
   // ------------------------------------------------------------ peloteo y carteles
@@ -137,7 +190,8 @@ export class HudScene extends Phaser.Scene {
     if (this.scene.isActive('Match')) this.scene.pause('Match');
     const touch = this.touch;
     const steps: { t: string; target: CtrlId | null }[] = [
-      { t: touch ? 'Muévete con la CRUCETA. Con el movimiento ASISTIDO tu jugadora corre sola hacia la bola.' : 'Muévete con WASD o las flechas. Con el movimiento ASISTIDO tu jugadora corre sola hacia la bola.', target: 'stick' },
+      { t: touch ? 'SAQUE en dos toques: el 1.º lanza la bola al aire; el 2.º golpea. Para la barra de POTENCIA en la zona VERDE para un saque perfecto.' : 'SAQUE en dos pulsaciones de J o ESPACIO: la 1.ª lanza la bola; la 2.ª golpea. Para la barra de POTENCIA en la zona VERDE.', target: 'hit' },
+      { t: touch ? 'Muévete con la CRUCETA. En AJUSTES eliges el movimiento: ASISTIDO (corre sola a la bola), SEMI (te mueves tú y te ayuda a colocarte) o MANUAL.' : 'Muévete con WASD o las flechas. En AJUSTES eliges el movimiento: ASISTIDO (corre sola a la bola), SEMI (te mueves tú y te ayuda a colocarte) o MANUAL.', target: 'stick' },
       { t: touch ? 'Cuando venga la bola verás un ANILLO en la arena. Pulsa GOLPE justo cuando se ponga VERDE: ¡golpe perfecto!' : 'Cuando venga la bola verás un ANILLO en la arena. Pulsa J o ESPACIO justo cuando se ponga VERDE: ¡golpe perfecto!', target: 'hit' },
       { t: 'Mientras viene la bola, la dirección APUNTA tu golpe: hacia la red = tiro PLANO, hacia atrás = GLOBO, arriba o abajo = a qué lado. La DIANA del campo rival te muestra dónde irá.', target: 'stick' },
       { t: touch ? 'Si la bola va alta, GOLPE hace un REMATE en salto. Llena la barra y pulsa ★ para lanzar tu golpe ESPECIAL.' : 'Si la bola va alta, golpear hace un REMATE en salto. Llena la barra y pulsa L para lanzar tu golpe ESPECIAL.', target: 'special' },
@@ -480,7 +534,8 @@ export class HudScene extends Phaser.Scene {
     this.names[0].setText(d.names[0] === 'TU' ? 'TÚ' : d.names[0]);
     this.names[1].setText(d.names[1]);
     this.serving = !!d.serving;
-    if (d.serving) this.hint.setText(this.touch ? 'Pulsa GOLPE para sacar' : 'Pulsa J o ESPACIO para sacar');
+    if (this.meterActive) return;
+    if (d.serving) this.hint.setText(this.touch ? 'Toca GOLPE para lanzar la bola' : 'Pulsa J o ESPACIO para lanzar la bola');
     else this.hint.setText('');
   }
 

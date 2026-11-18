@@ -8,7 +8,8 @@ export interface Settings {
   btnScale: number; // 0.6 .. 2
   opacity: number; // 0.15 .. 0.9
   leftHanded: boolean;
-  assist: boolean; // movimiento asistido hacia la bola
+  /** asistido: corre sola a la bola · semi: te mueves tú y un imán te coloca cerca de la bola · manual: sin ayuda */
+  movement: 'assist' | 'semi' | 'manual';
   autoSmash: boolean; // GOLPE con bola alta = salto + remate automático
   music: boolean;
   sound: boolean;
@@ -24,7 +25,7 @@ export const DEFAULT_POS: Settings['pos'] = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  stickScale: 1, btnScale: 1, opacity: 0.75, leftHanded: false, assist: true, autoSmash: true, music: true, sound: true,
+  stickScale: 1, btnScale: 1, opacity: 0.75, leftHanded: false, movement: 'assist', autoSmash: true, music: true, sound: true,
   pos: JSON.parse(JSON.stringify(DEFAULT_POS)),
 };
 
@@ -40,6 +41,8 @@ function load(): Settings {
       const out: Settings = { ...DEFAULT_SETTINGS, ...s, pos: { ...JSON.parse(JSON.stringify(DEFAULT_POS)), ...(s.pos || {}) } };
       out.opacity = Math.min(0.9, Math.max(0.15, out.opacity));
       delete (out as any).stickMode;
+      if (!s.movement) out.movement = s.assist === false ? 'manual' : 'assist'; // ajustes antiguos
+      delete (out as any).assist;
       return out;
     }
   } catch { /* sin almacenamiento: valores por defecto */ }

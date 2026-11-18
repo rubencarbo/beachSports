@@ -152,7 +152,7 @@ export class Player {
     if (this.stage !== 'none') {
       this.stageT += dt;
       const T = SWING_TIMES;
-      const wmax = this.swingType === 'serve' ? T.serveWindup + 0.3 : T.windupMax;
+      const wmax = this.swingType === 'serve' ? 3 : T.windupMax; // en el saque espera al segundo toque
       if (this.stage === 'windup' && this.stageT > wmax) { this.stage = 'snap'; this.stageT = 0; }
       else if (this.stage === 'snap' && this.stageT > T.snap) { this.stage = 'follow'; this.stageT = 0; }
       else if (this.stage === 'follow' && this.stageT > T.follow) { this.stage = 'recover'; this.stageT = 0; }

@@ -51,7 +51,8 @@ export class SettingsScene extends Phaser.Scene {
       p.add(segmented(this, cx + 30, row(i), cw, Math.min(58, step - 12), opts, act, cb, UI.teal));
     };
     seg(0, 'Mano', ['DIESTRO', 'ZURDO'], s.leftHanded ? 1 : 0, (j) => updateSettings({ leftHanded: j === 1 }));
-    seg(1, 'Movimiento', ['ASISTIDO', 'MANUAL'], s.assist ? 0 : 1, (j) => updateSettings({ assist: j === 0 }));
+    const moves = ['assist', 'semi', 'manual'] as const;
+    seg(1, 'Movimiento', ['ASISTIDO', 'SEMI', 'MANUAL'], moves.indexOf(s.movement), (j) => updateSettings({ movement: moves[j] }));
     seg(2, 'Remate', ['AUTOMÁTICO', 'CON SALTO'], s.autoSmash ? 0 : 1, (j) => updateSettings({ autoSmash: j === 0 }));
     seg(3, 'Música', ['SÍ', 'NO'], s.music ? 0 : 1, (j) => { updateSettings({ music: j === 0 }); this.game.events.emit('audio-settings'); });
     seg(4, 'Sonido', ['SÍ', 'NO'], s.sound ? 0 : 1, (j) => { updateSettings({ sound: j === 0 }); this.game.events.emit('audio-settings'); });

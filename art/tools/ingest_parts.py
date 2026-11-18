@@ -63,9 +63,12 @@ def to_native(a):
     return out, p
 
 
+CHROMA = {'gmin': 100, 'margin': 28}
+
+
 def chroma_mask(n):
     r, g, b = n[..., 0], n[..., 1], n[..., 2]
-    green = (g > 100) & (g > r + 28) & (g > b + 28)
+    green = (g > CHROMA['gmin']) & (g > r + CHROMA['margin']) & (g > b + CHROMA['margin'])
     return ~green
 
 
@@ -79,8 +82,11 @@ def despill(n, mask):
     edge &= mask
     greenish = g > np.maximum(r, b) + 6
     mask &= ~(edge & greenish)
+    # sólo el contorno (2 px) se neutraliza: el verde de la ropa se respeta
+    edge2 = edge.copy()
+    edge2[1:, :] |= edge[:-1, :]; edge2[:-1, :] |= edge[1:, :]; edge2[:, 1:] |= edge[:, :-1]; edge2[:, :-1] |= edge[:, 1:]
     lim = np.maximum(r, b)
-    n[..., 1] = np.where(mask & (g > lim), lim, g)
+    n[..., 1] = np.where(mask & edge2 & (g > lim + 10), lim + 10, g)
     return n
 
 
@@ -221,6 +227,9 @@ def main():
     for i, arg in enumerate(sys.argv):
         if arg == '--recolor':
             variants.append((sys.argv[i + 1], sys.argv[i + 2]))
+    if '--map' in sys.argv:
+        _cfg = json.load(open(sys.argv[sys.argv.index('--map') + 1]))
+        CHROMA.update(_cfg.get('chroma', {}))  # p. ej. ropa verde: croma más estricto
     a = np.asarray(Image.open(src).convert('RGB'), np.float32)
     n, p = to_native(a)
     mask = chroma_mask(n)

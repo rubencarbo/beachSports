@@ -19,6 +19,7 @@ export function computeShot(
   kind: ShotKind,
   aimZ: number,
   quality: number,
+  tScale = 1, // <1 = golpe más rápido (p. ej. saque potente)
 ) {
   const [d0, d1] = DEPTH[kind];
   let tx = -side * (d0 + Math.random() * (d1 - d0));
@@ -26,7 +27,7 @@ export function computeShot(
   const err = Math.pow(1 - quality, 1.6);
   tx += -side * (Math.random() * 2 - 0.6) * err * 3.2;
   tz += (Math.random() * 2 - 1) * err * 3.4;
-  let T = FLIGHT[kind] * (0.95 + Math.random() * 0.1);
+  let T = FLIGHT[kind] * tScale * (0.95 + Math.random() * 0.1);
   const g = PHYS.gravity;
   const wantClear = quality < 0.25 && Math.random() < 0.55 ? COURT.netH - 0.25 : COURT.netH + 0.22;
   let vx = 0, vy = 0, vz = 0;

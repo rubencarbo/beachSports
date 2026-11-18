@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
-import { ART_SCALE, COURT, COLORS, HORIZON_Y, STAGE_CX, STAGE_W, project } from '../config';
+import { COURT, COLORS, HORIZON_Y, STAGE_CX, STAGE_W, project } from '../config';
 import { CAM_BASE_Y } from '../fx/CameraDirector';
-import { FAN_VARIANTS } from '../core/characters';
 import { PIXEL_FONT } from '../core/fonts';
 
 /**
@@ -133,26 +132,31 @@ export class BeachStage {
 
     // público tras la valla del fondo
     const crowd = this.layer(0.69, 0.95, 8);
+    // público ilustrado (atlas 'crowd': f0..f7 con pose tranquila 'a' y animando 'b', y perro)
     const rows = [
-      { z: COURT.fenceZ + 1.7, sc: 1.0, n: 24 },
-      { z: COURT.fenceZ + 0.6, sc: 1.0, n: 20 },
+      { z: COURT.fenceZ + 1.7, n: 19, back: true },
+      { z: COURT.fenceZ + 0.6, n: 15, back: false },
     ];
+    const CROWD_SCALE = 2.45; // la altura del público ~60 % de la de las jugadoras
     for (const r of rows) {
       for (let i = 0; i < r.n; i++) {
-        const wx = -15 + (30 * i) / r.n + (Math.random() - 0.5) * 0.6 + (r.n === 20 ? 0.6 : 0);
+        const wx = -14.5 + (29 * i) / r.n + (Math.random() - 0.5) * 0.7 + (r.back ? 0 : 0.9);
         // hueco para el marcador detrás de la red
-        if (r.z < COURT.fenceZ + 0.8 && wx > 0.6 && wx < 3.4) continue;
+        if (!r.back && wx > 0.6 && wx < 3.4) continue;
         const p = project(wx, 0, r.z);
-        const idx = Math.floor(Math.random() * FAN_VARIANTS);
-        const im = s.add.sprite(p.x, p.y, `fan${idx}`, 'a').setOrigin(0.5, 0.97).setScale(ART_SCALE * p.k * 1.6 * r.sc * (0.9 + Math.random() * 0.18));
-        if (Math.random() < 0.5) im.setFlipX(true);
+        let t = Math.floor(Math.random() * 8);
+        if (!r.back && t === 5) t = Math.floor(Math.random() * 5); // el padre con el niño, sólo detrás
+        const im = s.add.sprite(p.x, p.y, 'crowd', `f${t}a`).setOrigin(0.5, 1).setScale(CROWD_SCALE * p.k * (0.92 + Math.random() * 0.14));
+        if (t !== 2 && t !== 3 && Math.random() < 0.5) im.setFlipX(true); // los carteles siempre de frente
         crowd.add(im);
-        this.fans.push({ s: im, baseY: p.y, phase: Math.random() * 10, sign: idx % 4 === 0, amp: 1 + Math.random() * 2, up: 0 });
+        this.fans.push({ s: im, baseY: p.y, phase: Math.random() * 10, sign: t === 2 || t === 3, amp: 1 + Math.random() * 2, up: 0, keyA: `f${t}a`, keyB: `f${t}b` });
       }
     }
-    for (const wx of [-4.5, 2.8, 6.5]) {
-      const p = project(wx, 0, COURT.fenceZ + 0.4);
-      crowd.add(s.add.image(p.x, p.y, 'dogpx').setOrigin(0.5, 1).setScale(ART_SCALE * p.k * 1.1).setFlipX(wx > 0));
+    for (const wx of [-6.2, 4.6, 9.5]) {
+      const p = project(wx, 0, COURT.fenceZ + 0.35);
+      const dog = s.add.sprite(p.x, p.y, 'crowd', 'dog_a').setOrigin(0.5, 1).setScale(CROWD_SCALE * p.k * 0.9).setFlipX(wx > 0);
+      crowd.add(dog);
+      this.fans.push({ s: dog, baseY: p.y, phase: Math.random() * 10, sign: false, amp: 0.5, up: 0, keyA: 'dog_a', keyB: 'dog_b' });
     }
     // marcador de madera detrás de la red
     const bp = project(2, 0, COURT.fenceZ + 0.45);
@@ -200,7 +204,7 @@ export class BeachStage {
   private buildCourt(c: Phaser.GameObjects.Container) {
     const s = this.scene;
     // arena
-    const sandTop = project(0, 0, COURT.fenceZ + 2.5).y;
+    const sandTop = project(0, 0, COURT.fenceZ - 0.05).y; // empieza en la valla: el público de detrás se ve de cuerpo entero
     const sand = s.add.tileSprite(STAGE_CX, sandTop, STAGE_W + 1600, 900, 'sand').setOrigin(0.5, 0);
     c.add(sand);
     const shade = s.add.graphics();
@@ -261,11 +265,23 @@ export class BeachStage {
         }
       }
     }
-    // valla baja de madera/lona en el centro abierto
+    // centro abierto: sólo un cordón bajo con postes (el público se ve de cuerpo entero, como en el vídeo)
     {
-      const a = P(-5.3, 0, fz), b = P(5.3, 0, fz), at = P(-5.3, 0.7, fz), bt = P(5.3, 0.7, fz);
-      g.fillStyle(0x2a6fd6, 0.9).fillPoints([at, bt, b, a].map((p) => new Phaser.Math.Vector2(p.x, p.y)), true);
-      g.fillStyle(0xffffff, 0.9).fillRect(at.x, at.y, bt.x - at.x, 3);
+      const ropeY = 0.55;
+      for (let x = -5.3; x <= 5.31; x += 2.65) {
+        const a = P(x, 0, fz), b = P(x, ropeY + 0.08, fz);
+        g.lineStyle(6, 0x2b3038, 1).lineBetween(a.x, a.y, b.x, b.y);
+        g.fillStyle(0xffffff, 1).fillCircle(b.x, b.y, 3.5 * a.k);
+      }
+      g.lineStyle(3, 0xe8433a, 1);
+      g.beginPath();
+      for (let i = 0; i <= 40; i++) {
+        const x = -5.3 + (10.6 * i) / 40;
+        const seg = ((x + 5.3) % 2.65) / 2.65;
+        const q = P(x, ropeY - Math.sin(seg * Math.PI) * 0.12, fz);
+        if (i === 0) g.moveTo(q.x, q.y); else g.lineTo(q.x, q.y);
+      }
+      g.strokePath();
     }
     // carteles en el cristal
     for (const x of [-8.6, 6.6]) {
@@ -422,7 +438,7 @@ export class BeachStage {
         const up = f.up > 0;
         const isSil = group === this.fg;
         if (isSil) f.s.setTexture(up ? f.keyB! : f.keyA!);
-        else f.s.setFrame(up ? (f.sign ? 'd' : Math.sin(t * 9 + f.phase) > 0 ? 'b' : 'c') : 'a');
+        else f.s.setFrame(up ? f.keyB! : f.keyA!);
         const jump = up ? Math.abs(Math.sin(t * 9 + f.phase)) * 10 * f.amp * 0.6 : 0;
         // movimiento a saltos de 1 px de arte
         const bob = Math.round(Math.abs(Math.sin(t * 2 + f.phase)) * f.amp);

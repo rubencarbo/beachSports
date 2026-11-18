@@ -8,6 +8,8 @@ import rigSunUrl from '../assets/rig_sun.png';
 import rigWaveUrl from '../assets/rig_wave.png';
 import rigSunJson from '../assets/rig_sun.json';
 import rigWaveJson from '../assets/rig_wave.json';
+import crowdUrl from '../assets/crowd.png';
+import crowdJson from '../assets/crowd.json';
 import { RigData, registerRigFrames } from '../entities/Rig';
 
 export class BootScene extends Phaser.Scene {
@@ -17,12 +19,14 @@ export class BootScene extends Phaser.Scene {
     this.load.image('ref_strip', refStripUrl);
     this.load.image('rig_sun', rigSunUrl);
     this.load.image('rig_wave', rigWaveUrl);
+    this.load.image('crowd', crowdUrl);
   }
   create() {
     generateTextures(this);
     bakeCrowd(this);
     registerRigFrames(this, 'rig_sun', rigSunJson as unknown as RigData);
     registerRigFrames(this, 'rig_wave', rigWaveJson as unknown as RigData);
+    registerRigFrames(this, 'crowd', crowdJson as unknown as RigData);
     const go = () => {
       if (location.hash === '#lab') { this.scene.start('Lab'); return; }
       this.scene.start('Match', { mode: 'attract' });
