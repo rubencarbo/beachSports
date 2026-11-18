@@ -11,7 +11,7 @@ import { PIXEL_FONT } from '../core/fonts';
  */
 
 interface Layer { c: Phaser.GameObjects.Container; sx: number; sy: number; pinBottom?: boolean; screen?: boolean }
-interface Fan { s: Phaser.GameObjects.Sprite; baseY: number; phase: number; sign: boolean; amp: number; up: number; keyA?: string; keyB?: string }
+interface Fan { s: Phaser.GameObjects.Sprite; baseY: number; phase: number; sign: boolean; amp: number; up: number; keyA?: string; keyB?: string; baseX?: number; delay?: number; speed?: number }
 
 export class BeachStage {
   layers: Layer[] = [];
@@ -194,7 +194,7 @@ export class BeachStage {
         const y = row.y + Math.random() * 18;
         const im = s.add.sprite(x, y, `silS${v}a`).setOrigin(0.5, 0.72).setScale(row.sc * 0.95 * (0.9 + Math.random() * 0.2)).setFlipX(Math.random() < 0.5);
         fgL.add(im);
-        this.fg.push({ s: im, baseY: y, phase: Math.random() * 10, sign: false, amp: 2 + Math.random() * 3, up: 0, keyA: `silS${v}a`, keyB: `silS${v}b` });
+        this.fg.push({ s: im, baseY: y, baseX: x, phase: Math.random() * 10, speed: 0.75 + Math.random() * 0.5, sign: false, amp: 1, up: 0, delay: 0, keyA: `silS${v}a`, keyB: `silS${v}b` });
       }
     }
     // hoja de palmera oscura y desenfocada en la esquina inferior derecha (como en el vídeo)
@@ -397,7 +397,11 @@ export class BeachStage {
   /** El público reacciona: 1 = locura (especial / punto). */
   cheer(amount: number, foreground = true) {
     this.excitement = Math.min(1, Math.max(this.excitement, amount));
-    for (const f of foreground ? [...this.fans, ...this.fg] : this.fans) if (Math.random() < amount * 0.85) f.up = 0.8 + Math.random() * 1.6 * amount;
+    for (const f of this.fans) if (Math.random() < amount * 0.85) f.up = 0.8 + Math.random() * 1.6 * amount;
+    if (foreground) {
+      // primer plano: sólo una parte se anima, cada persona con su pequeño retraso
+      for (const f of this.fg) if (Math.random() < amount * 0.45) { f.delay = Math.random() * 0.5; f.up = 1.2 + Math.random() * 1.2 * amount; }
+    }
   }
 
   /** Aplica el parallax real a cada capa según la cámara. */
@@ -442,13 +446,24 @@ export class BeachStage {
 
     // público: balanceo base + saltos cuando están emocionados
     this.excitement = Math.max(0, this.excitement - dt * 0.25);
-    for (const group of [this.fans, this.fg]) {
+    // primer plano: movimiento sutil y natural (respiración, cambio de peso, leve balanceo)
+    for (const f of this.fg) {
+      if ((f.delay ?? 0) > 0) { f.delay! -= dt; } else if (f.up > 0) f.up -= dt;
+      const up = f.up > 0 && (f.delay ?? 0) <= 0;
+      f.s.setTexture(up ? f.keyB! : f.keyA!);
+      const sp = f.speed ?? 1;
+      const breathe = Math.sin(t * 1.1 * sp + f.phase) * 1.3;
+      const weight = Math.sin(t * 0.33 * sp + f.phase * 1.7) + 0.4 * Math.sin(t * 0.71 * sp + f.phase);
+      const bounce = up ? Math.abs(Math.sin(t * 4.2 * sp + f.phase)) * 5 : 0;
+      f.s.x = (f.baseX ?? f.s.x) + weight * 3;
+      f.s.y = f.baseY + breathe - bounce;
+      f.s.rotation = weight * 0.012 + (up ? Math.sin(t * 4.2 * sp + f.phase) * 0.01 : 0);
+    }
+    for (const group of [this.fans]) {
       for (const f of group) {
         if (f.up > 0) f.up -= dt;
         const up = f.up > 0;
-        const isSil = group === this.fg;
-        if (isSil) f.s.setTexture(up ? f.keyB! : f.keyA!);
-        else f.s.setFrame(up ? f.keyB! : f.keyA!);
+        f.s.setFrame(up ? f.keyB! : f.keyA!);
         const jump = up ? Math.abs(Math.sin(t * 9 + f.phase)) * 10 * f.amp * 0.6 : 0;
         // movimiento a saltos de 1 px de arte
         const bob = Math.round(Math.abs(Math.sin(t * 2 + f.phase)) * f.amp);
