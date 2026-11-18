@@ -10,6 +10,8 @@ export class MenuScene extends Phaser.Scene {
   private difficulty: 'facil' | 'normal' | 'dificil' = 'normal';
   private points = 7;
   private mode: 'friendly' | 'tournament' = 'friendly';
+  private sport: 'palas' | 'futvoley' = 'palas';
+  private format: '1v1' | '2v2' = '1v1';
   private root!: Phaser.GameObjects.Container;
 
   constructor() { super('Menu'); }
@@ -62,7 +64,7 @@ export class MenuScene extends Phaser.Scene {
     rib.fillTriangle(lx + rw / 2 + 30, ry + 6, lx + rw / 2, ry - 10, lx + rw / 2, ry + 26);
     block(rib, lx - rw / 2, ry - 26, rw, 54, UI.red);
     c.add(rib);
-    c.add(label(this, lx, ry, 'TORNEO DE PALAS', 30, '#fff3d6'));
+    c.add(label(this, lx, ry, 'TORNEO DE PLAYA', 30, '#fff3d6'));
 
     // ---- letrero de opciones
     const pw = Math.min(640, w * 0.46), ph = Math.min(640, h - 40);
@@ -77,10 +79,17 @@ export class MenuScene extends Phaser.Scene {
     SPORTS.forEach((s, i) => {
       const cx = -pw / 2 + 30 + cw * i + cw / 2;
       const card = this.add.graphics();
-      block(card, cx - cw / 2 + 4, y - 34, cw - 8, 76, s.available ? UI.teal : 0x55607e);
+      const sel = s.id === this.sport;
+      if (sel) block(card, cx - cw / 2, y - 38, cw, 84, UI.yellow, { shadow: false });
+      block(card, cx - cw / 2 + 4, y - 34, cw - 8, 76, s.available ? (sel ? UI.teal : 0x2c6f86) : 0x55607e);
       icon(card, icons[i], cx - cw * 0.28, y + 4, 34, s.available ? UI.cream : 0xb8c0d4);
       p.add(card);
       p.add(label(this, cx + 18, y + 4, s.name, 17, s.available ? '#fff3d6' : '#c8cfe0', { wordWrap: { width: cw * 0.6 }, align: 'center' }));
+      if (s.available) {
+        const hit = this.add.rectangle(cx, y + 4, cw - 8, 76, 0, 0).setInteractive({ useHandCursor: true });
+        hit.on('pointerup', () => { sfx.ui(); this.sport = s.id as 'palas' | 'futvoley'; if (this.sport === 'palas') this.format = '1v1'; this.build(); });
+        p.add(hit);
+      }
       if (!s.available) {
         const lk = this.add.graphics();
         block(lk, cx + cw / 2 - 44, y - 46, 38, 32, UI.ink, { shadow: false });
@@ -89,9 +98,12 @@ export class MenuScene extends Phaser.Scene {
       }
     });
     y += 74;
-    p.add(label(this, -pw / 2 + 30, y, 'MODO', 24, '#fff3d6').setOrigin(0, 0.5));
+    const foot = this.sport === 'futvoley';
+    p.add(label(this, -pw / 2 + 30, y, foot ? 'MODO Y FORMATO' : 'MODO', 24, '#fff3d6').setOrigin(0, 0.5));
     y += 44;
-    p.add(segmented(this, 0, y, pw - 60, 58, ['AMISTOSO', 'TORNEO (8)'], this.mode === 'friendly' ? 0 : 1, (i) => { this.mode = i === 0 ? 'friendly' : 'tournament'; this.build(); }, UI.orange));
+    const mw = foot ? (pw - 72) / 2 : pw - 60;
+    p.add(segmented(this, foot ? -pw / 2 + 30 + mw / 2 : 0, y, mw, 58, ['AMISTOSO', 'TORNEO (8)'], this.mode === 'friendly' ? 0 : 1, (i) => { this.mode = i === 0 ? 'friendly' : 'tournament'; if (this.mode === 'tournament') this.format = '1v1'; this.build(); }, UI.orange));
+    if (foot) p.add(segmented(this, pw / 2 - 30 - mw / 2, y, mw, 58, ['1 VS 1', '2 VS 2'], this.format === '1v1' ? 0 : 1, (i) => { this.format = i === 0 ? '1v1' : '2v2'; if (this.format === '2v2') this.mode = 'friendly'; this.build(); }, UI.teal));
     y += 60;
     p.add(label(this, -pw / 2 + 30, y, 'DIFICULTAD', 24, '#fff3d6').setOrigin(0, 0.5));
     y += 44;
@@ -127,7 +139,7 @@ export class MenuScene extends Phaser.Scene {
     if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {});
     (screen.orientation as any)?.lock?.('landscape').catch?.(() => {});
     // elegir personaje (la partida de demostración sigue de fondo)
-    this.scene.launch('Select', { mode: this.mode, difficulty: this.difficulty, points: this.points });
+    this.scene.launch('Select', { mode: this.mode, difficulty: this.difficulty, points: this.points, sport: this.sport, format: this.format });
     this.scene.stop();
   }
 }

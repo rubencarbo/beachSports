@@ -369,6 +369,19 @@ export function generateTextures(scene: Phaser.Scene) {
     });
   }
   generateForeground(scene);
+  // balón de futvóley (paneles blanco/amarillo/azul, como los balones de playa de competición)
+  canvasTex(scene, 'football', 64, 64, (c, w) => {
+    const r = w / 2 - 2;
+    c.save(); c.beginPath(); c.arc(w / 2, w / 2, r, 0, Math.PI * 2); c.clip();
+    c.fillStyle = '#f7f4ea'; c.fillRect(0, 0, w, w);
+    const band = (col: string, a: number) => { c.save(); c.translate(w / 2, w / 2); c.rotate(a); c.fillStyle = col; c.beginPath(); c.ellipse(0, 0, r * 1.1, r * 0.34, 0, 0, Math.PI * 2); c.fill(); c.restore(); };
+    band('#ffcf1f', 0.5); band('#1f5fd6', -0.6); band('#f7f4ea', 1.6);
+    const g = c.createRadialGradient(w * 0.35, w * 0.3, 2, w / 2, w / 2, r);
+    g.addColorStop(0, 'rgba(255,255,255,.55)'); g.addColorStop(0.6, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(30,40,80,.35)');
+    c.fillStyle = g; c.fillRect(0, 0, w, w);
+    c.restore();
+    c.strokeStyle = '#2a2f45'; c.lineWidth = 2.5; c.beginPath(); c.arc(w / 2, w / 2, r, 0, Math.PI * 2); c.stroke();
+  });
   // arena de cada sede
   for (const v of VENUES) {
     canvasTex(scene, `sand_${v.id}`, 512, 512, (c, w, h) => {

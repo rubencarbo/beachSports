@@ -24,6 +24,7 @@ export class BeachStage {
   private palms: Phaser.GameObjects.Image[] = [];
   private rays!: Phaser.GameObjects.Image;
   excitement = 0; // 0..1
+  netH = COURT.netH;
   private frondL!: Phaser.GameObjects.Image;
   private frondR!: Phaser.GameObjects.Image;
   private frondBR!: Phaser.GameObjects.Image;
@@ -373,7 +374,7 @@ export class BeachStage {
     const P = (x: number, y: number, z: number) => project(x, y, z);
     const g = this.netG;
     g.clear();
-    const z0 = -0.4, z1 = COURT.width + 0.4, h = COURT.netH;
+    const z0 = -0.4, z1 = COURT.width + 0.4, h = this.netH;
     g.lineStyle(1.4, 0x15181f, 0.62);
     for (let z = z0; z <= z1; z += 0.18) {
       const a = P(0, 0.08, z), b = P(0, h - 0.06, z);

@@ -63,6 +63,29 @@ export const POSES = {
   sad: P(0.45, 1, [0.15, 0.1], [-0.1, 0.1], [0.05, 0.1], [-0.05, 0.1], 0.0, 0.3),
   stun: P(-0.5, 2, [0.75, 0.35], [0.1, 0.65], [-2.0, 0.5], [2.4, 0.6], 0.6, -0.3),
   power: P(0.1, 5, [0.6, 1.1], [-0.55, 0.95], [2.9, 1.0], [1.5, 0.3], 0.4, -0.1),
+  // ---- futvóley (sin pala): guardia con brazos sueltos para equilibrio
+  footReady: P(0.22, 3, [0.45, 0.9], [-0.35, 0.8], [0.5, 0.6], [0.35, 0.7], 0, 0),
+  footReadyLow: P(0.3, 6, [0.6, 1.25], [-0.45, 1.1], [0.7, 0.5], [0.5, 0.6], 0, 0),
+  // patada de empeine: pierna atrás -> latigazo hacia delante y arriba
+  kickWind: P(-0.05, 2, [-0.75, 1.5], [0.15, 0.35], [1.0, 0.4], [0.9, 0.5], 0, -0.1),
+  kickHit: P(-0.25, 2, [1.35, 0.1], [0.05, 0.3], [1.3, 0.3], [1.2, 0.4], 0, 0.1),
+  kickFollow: P(-0.3, 2, [1.8, 0.35], [0.0, 0.3], [1.5, 0.3], [1.0, 0.5], 0, 0.1),
+  // cabezazo: echar la cabeza atrás y golpear hacia delante
+  headWind: P(-0.35, 4, [0.5, 1.1], [-0.4, 0.9], [1.3, 0.5], [1.4, 0.5], 0, -0.35),
+  headHit: P(0.35, 2, [0.5, 0.7], [-0.5, 0.6], [0.9, 0.6], [1.0, 0.6], 0, 0.3),
+  headFollow: P(0.25, 2, [0.5, 0.7], [-0.5, 0.6], [0.6, 0.8], [0.7, 0.8], 0, 0.15),
+  // control con el pecho: cuerpo atrás y brazos abiertos
+  chestWind: P(-0.5, 4, [0.55, 1.2], [-0.35, 1.0], [1.7, 0.2], [1.9, 0.2], 0, -0.25),
+  chestHit: P(-0.6, 3, [0.5, 1.0], [-0.4, 0.9], [1.9, 0.1], [2.1, 0.1], 0, -0.3),
+  chestFollow: P(-0.2, 3, [0.5, 0.9], [-0.4, 0.8], [1.2, 0.3], [1.4, 0.3], 0, -0.1),
+  // "shark attack": remate en tijera en el aire
+  sharkWind: P(-0.45, 0, [-0.5, 1.6], [0.9, 1.6], [2.2, 0.3], [2.6, 0.2], 0, -0.3),
+  sharkHit: P(-0.55, 0, [2.5, 0.05], [-0.3, 1.2], [1.4, 0.3], [2.5, 0.3], 0, 0.2),
+  sharkFollow: P(-0.2, 0, [1.9, 0.4], [0.2, 1.0], [1.0, 0.4], [1.6, 0.4], 0, 0.2),
+  // saque de futvóley: patada desde el suelo
+  fkWind: P(0.1, 3, [-0.9, 1.7], [0.2, 0.4], [1.2, 0.3], [0.8, 0.5], 0, 0.2),
+  fkHit: P(-0.15, 2, [1.2, 0.05], [0.1, 0.3], [1.4, 0.3], [1.0, 0.4], 0, 0.25),
+  fkFollow: P(-0.25, 2, [1.6, 0.3], [0.05, 0.3], [1.5, 0.3], [0.9, 0.5], 0, 0.15),
 };
 export type PoseName = keyof typeof POSES;
 
@@ -79,6 +102,8 @@ function upper(a: Pose, b: Pose, t: number): Pose {
   return { ...a, lean: lerp(a.lean, b.lean, t), armF: L2(a.armF, b.armF, t), armB: L2(a.armB, b.armB, t), pad: lerp(a.pad, b.pad, t), head: lerp(a.head, b.head, t) };
 }
 
+export type SwingKind = 'fore' | 'over' | 'serve' | 'kick' | 'head' | 'chest' | 'shark' | 'fkserve';
+
 export interface RigInput {
   time: number; // s
   speed: number; // m/s
@@ -86,7 +111,7 @@ export interface RigInput {
   runPhase: number;
   airborne: boolean;
   vy: number;
-  swing: { type: 'fore' | 'over' | 'serve'; stage: 'none' | 'windup' | 'snap' | 'follow' | 'recover'; t: number };
+  swing: { type: SwingKind; stage: 'none' | 'windup' | 'snap' | 'follow' | 'recover'; t: number };
   mood: 'none' | 'happy' | 'sad';
   powered: boolean;
   stunned: boolean;
@@ -110,14 +135,14 @@ export const ANIM = {
   paddleWobble: 0.3,
 };
 
-function runPose(ph: number, back: boolean): Pose {
+function runPose(ph: number, back: boolean, noPaddle = false): Pose {
   const amp = back ? 0.65 : 1.0;
   const leg = (p: number): [number, number] => [amp * Math.sin(p), 0.45 + 1.55 * Math.max(0, -Math.sin(p - 0.9))];
   return {
     lean: back ? -0.05 : ANIM.runLean, bob: -Math.abs(Math.sin(ph)) * ANIM.runBob + 1.5,
     legF: leg(ph), legB: leg(ph + Math.PI),
     // corre con la pala arriba delante (en guardia) y el brazo libre bombeando
-    armF: [0.6 - 0.15 * Math.sin(ph), 1.0], armB: [0.2 + 0.9 * Math.sin(ph), 1.4], pad: 1.0, head: 0,
+    armF: noPaddle ? [0.2 - 0.9 * Math.sin(ph), 1.4] : [0.6 - 0.15 * Math.sin(ph), 1.0], armB: [0.2 + 0.9 * Math.sin(ph), 1.4], pad: 1.0, head: 0,
   };
 }
 
@@ -136,7 +161,10 @@ export class Rig {
   private hk = 1;
   private lk = 1;
 
-  constructor(scene: Phaser.Scene, key: string, data: RigData) {
+  noPaddle = false;
+
+  constructor(scene: Phaser.Scene, key: string, data: RigData, opts: { noPaddle?: boolean } = {}) {
+    this.noPaddle = !!opts.noPaddle;
     this.hk = data.scale?.head ?? 1;
     this.lk = data.scale?.leg ?? 1;
     this.F = data.frames;
@@ -162,6 +190,7 @@ export class Rig {
         : [mk('upperF', 'upperarm'), mk('paddle', 'paddle'), mk('foreF', 'forearm')]),
     ]);
     if (!this.F.paddlehand) this.parts.paddle.setOrigin(0.5, 0.84);
+    if (this.noPaddle) this.parts.paddle.setVisible(false);
     // el antebrazo con pala se recorta en la muñeca (la mano la pone la pieza de la pala)
     const fa = this.F.forearm;
     if (this.F.paddlehand) this.parts.foreF.setCrop(0, 0, fa.w, Math.round(fa.h * 0.66));
@@ -196,8 +225,9 @@ export class Rig {
     if (s.airborne) base = s.vy > 0.5 ? POSES.jumpUp : lerpPose(POSES.jumpUp, POSES.tuck, Math.min(1, (0.5 - s.vy) / 2));
     else {
       const bob = Math.sin(s.time * Math.PI * 2 * ANIM.idleBobHz) * ANIM.idleBob;
-      const idle = { ...lerpPose(POSES.ready, POSES.readyLow, s.prep * 0.6), bob: POSES.ready.bob + bob };
-      base = s.speed > 0.3 ? lerpPose(idle, runPose(s.runPhase, s.fwd < -1), Math.min(1, s.speed / 3)) : idle;
+      const R0 = this.noPaddle ? POSES.footReady : POSES.ready, R1 = this.noPaddle ? POSES.footReadyLow : POSES.readyLow;
+      const idle = { ...lerpPose(R0, R1, s.prep * 0.6), bob: R0.bob + bob };
+      base = s.speed > 0.3 ? lerpPose(idle, runPose(s.runPhase, s.fwd < -1, this.noPaddle), Math.min(1, s.speed / 3)) : idle;
       if (s.powered && s.speed < 0.3) base = POSES.power;
     }
     if (s.crouch > 0) base = lerpPose(base, POSES.land, s.crouch);
@@ -206,12 +236,20 @@ export class Rig {
     if (s.mood === 'sad') return { pose: POSES.sad, rate: ANIM.blendSlow };
 
     const sw = s.swing;
-    const seq = sw.type === 'over'
+    const FOOT: Record<string, Pose[]> = {
+      kick: [POSES.kickWind, POSES.kickHit, POSES.kickFollow],
+      head: [POSES.headWind, POSES.headHit, POSES.headFollow],
+      chest: [POSES.chestWind, POSES.chestHit, POSES.chestFollow],
+      shark: [POSES.sharkWind, POSES.sharkHit, POSES.sharkFollow],
+      fkserve: [POSES.fkWind, POSES.fkHit, POSES.fkFollow],
+    };
+    const seq = FOOT[sw.type] ?? (sw.type === 'over'
       ? [POSES.overWind, POSES.overHit, POSES.overFollow]
       : sw.type === 'serve' ? [sw.t > 0.22 ? POSES.serveCock : POSES.serveToss, POSES.serveHit, POSES.serveFollow]
-        : [POSES.foreWind, POSES.foreHit, POSES.foreFollow];
-    const full = sw.type === 'serve' || (sw.type === 'over' && s.airborne);
-    const mix = (p: Pose) => (full ? (s.airborne ? { ...p, legF: base.legF, legB: base.legB, bob: base.bob } : p) : upper(base, p, 1));
+        : [POSES.foreWind, POSES.foreHit, POSES.foreFollow]);
+    const legsOwn = sw.type === 'kick' || sw.type === 'shark' || sw.type === 'fkserve';
+    const full = sw.type === 'serve' || !!FOOT[sw.type] || (sw.type === 'over' && s.airborne);
+    const mix = (p: Pose) => (full ? (s.airborne && !legsOwn ? { ...p, legF: base.legF, legB: base.legB, bob: base.bob } : p) : upper(base, p, 1));
     switch (sw.stage) {
       case 'windup': return { pose: mix(seq[0]), rate: ANIM.blendFast };
       case 'snap': return { pose: mix(seq[1]), rate: 60, snap: sw.t < 0.02 };
@@ -224,7 +262,7 @@ export class Rig {
       case 'recover': return { pose: base, rate: ANIM.blendNormal };
     }
     // anticipación: la pala se prepara sola cuando la bola se acerca
-    if (s.prep > 0) return { pose: upper(base, POSES.foreWind, s.prep * 0.45), rate: ANIM.blendNormal };
+    if (s.prep > 0 && !this.noPaddle) return { pose: upper(base, POSES.foreWind, s.prep * 0.45), rate: ANIM.blendNormal };
     return { pose: base, rate: s.airborne ? ANIM.blendFast : ANIM.blendNormal };
   }
 

@@ -24,6 +24,9 @@ export class Ball {
   crossedNet = false;
   hitNet = false;
   spin = 0;
+  /** altura de la red (palas 1,7 m; futvóley 2,1 m) y tamaño visual de la bola */
+  netH = COURT.netH;
+  size = 1;
 
   sprite: Phaser.GameObjects.Image;
   shadow: Phaser.GameObjects.Image;
@@ -62,7 +65,7 @@ export class Ball {
 
     // cruce de red
     if (Math.sign(px) !== Math.sign(this.x) && px !== 0 && this.z > -0.3 && this.z < COURT.width + 0.3) {
-      if (this.y < COURT.netH) {
+      if (this.y < this.netH) {
         this.x = px > 0 ? 0.12 : -0.12;
         this.vx *= -0.15; this.vz *= 0.3; this.vy = Math.min(this.vy, 0) * 0.3;
         this.hitNet = true;
@@ -102,7 +105,7 @@ export class Ball {
   render() {
     const p = project(this.x, this.y, this.z);
     const g = project(this.x, 0, this.z);
-    this.sprite.setPosition(p.x, p.y).setScale(0.74 * p.k).setRotation(this.spin);
+    this.sprite.setPosition(p.x, p.y).setScale(0.74 * p.k * this.size).setRotation(this.spin);
     this.sprite.setDepth(depthFor(this.z) + 0.5);
     const hScale = Math.max(0.3, 1 - this.y * 0.08);
     this.shadow.setPosition(g.x, g.y).setScale(0.7 * p.k * hScale, 0.75 * p.k * hScale).setAlpha(0.8 * hScale);

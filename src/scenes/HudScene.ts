@@ -38,7 +38,11 @@ export class HudScene extends Phaser.Scene {
 
   constructor() { super('Hud'); }
 
-  init(d: { edit?: boolean | 'settings'; standalone?: boolean }) {
+  /** escena de juego activa ('Match' palas o 'Foot' futvóley) */
+  private gk = 'Match';
+
+  init(d: { edit?: boolean | 'settings'; standalone?: boolean; game?: string }) {
+    this.gk = d.game ?? 'Match';
     this.edit = !!d.edit;
     this.editMode = d.edit === 'settings' ? 'settings' : 'place';
     this.standalone = !!d.standalone;
@@ -50,7 +54,7 @@ export class HudScene extends Phaser.Scene {
   create() {
     this.touch = this.sys.game.device.input.touch;
     this.input.addPointer(3);
-    const m = this.scene.get('Match') as any;
+    const m = this.scene.get(this.gk) as any;
     this.target = m?.cfg?.points ?? 7;
     this.buildTop();
     this.buildControls();
@@ -96,7 +100,7 @@ export class HudScene extends Phaser.Scene {
     this.layout();
     if (this.edit) this.setEdit(true);
     let seen = false;
-    try { seen = localStorage.getItem('beachsports.tutorial') === '1'; } catch { /* sin almacenamiento */ }
+    try { seen = localStorage.getItem(this.gk === 'Foot' ? 'beachsports.tutorial.foot' : 'beachsports.tutorial') === '1'; } catch { /* sin almacenamiento */ }
     if (!this.standalone && !this.edit && !seen) this.time.delayedCall(700, () => this.startTutorial());
   }
 
@@ -189,9 +193,16 @@ export class HudScene extends Phaser.Scene {
   private tutTarget: CtrlId | null = null;
   startTutorial() {
     if (this.tutUi) return;
-    if (this.scene.isActive('Match')) this.scene.pause('Match');
+    if (this.scene.isActive(this.gk)) this.scene.pause(this.gk);
     const touch = this.touch;
-    const steps: { t: string; target: CtrlId | null }[] = [
+    const foot = this.gk === 'Foot';
+    const stepsFoot: { t: string; target: CtrlId | null }[] = [
+      { t: 'FUTVÓLEY: sin manos. Cada equipo tiene hasta 3 TOQUES (pie, pecho o cabeza) antes de pasar el balón. Si toca la arena, es punto.', target: null },
+      { t: touch ? 'Saque con el pie: el 1.er toque de GOLPE prepara el saque, el 2.º patea. Para la barra en la zona VERDE.' : 'Saque con el pie: la 1.ª pulsación prepara el saque, la 2.ª patea. Para la barra en la zona VERDE.', target: 'hit' },
+      { t: touch ? 'Pulsa GOLPE cuando el ANILLO se ponga verde. Toque 1 = CONTROL, toque 2 = LEVANTADA cerca de la red, toque 3 = ATAQUE.' : 'Pulsa J/ESPACIO cuando el ANILLO se ponga verde. Toque 1 = CONTROL, toque 2 = LEVANTADA, toque 3 = ATAQUE.', target: 'hit' },
+      { t: 'Inclina la dirección hacia la red para ATACAR antes. Si la levantada va alta, harás un SHARK ATTACK en el aire. Con la barra llena, ★ = ¡chilena especial!', target: 'stick' },
+    ];
+    const steps: { t: string; target: CtrlId | null }[] = foot ? stepsFoot : [
       { t: touch ? 'SAQUE en dos toques: el 1.º lanza la bola al aire; el 2.º golpea. Para la barra de POTENCIA en la zona VERDE para un saque perfecto.' : 'SAQUE en dos pulsaciones de J o ESPACIO: la 1.ª lanza la bola; la 2.ª golpea. Para la barra de POTENCIA en la zona VERDE.', target: 'hit' },
       { t: touch ? 'Muévete con la CRUCETA. En AJUSTES eliges el movimiento: ASISTIDO (corre sola a la bola), SEMI (te mueves tú y te ayuda a colocarte) o MANUAL.' : 'Muévete con WASD o las flechas. En AJUSTES eliges el movimiento: ASISTIDO (corre sola a la bola), SEMI (te mueves tú y te ayuda a colocarte) o MANUAL.', target: 'stick' },
       { t: touch ? 'Cuando venga la bola verás un ANILLO en la arena. Pulsa GOLPE justo cuando se ponga VERDE: ¡golpe perfecto!' : 'Cuando venga la bola verás un ANILLO en la arena. Pulsa J o ESPACIO justo cuando se ponga VERDE: ¡golpe perfecto!', target: 'hit' },
@@ -219,8 +230,8 @@ export class HudScene extends Phaser.Scene {
 
   private endTutorial() {
     this.tutUi?.destroy(); this.tutUi = undefined; this.tutTarget = null;
-    try { localStorage.setItem('beachsports.tutorial', '1'); } catch { /* ignorar */ }
-    if (!this.pauseUi && this.scene.isPaused('Match')) this.scene.resume('Match');
+    try { localStorage.setItem(this.gk === 'Foot' ? 'beachsports.tutorial.foot' : 'beachsports.tutorial', '1'); } catch { /* ignorar */ }
+    if (!this.pauseUi && this.scene.isPaused(this.gk)) this.scene.resume(this.gk);
   }
 
   // ------------------------------------------------------------ marcador tipo TV
@@ -248,7 +259,7 @@ export class HudScene extends Phaser.Scene {
     this.meters = this.add.graphics();
     this.serveIcon = this.add.graphics();
     c.add([...this.scoreTxt, ...this.names, this.meters, this.serveIcon]);
-    const mc = (this.scene.get('Match') as any)?.cfg ?? {};
+    const mc = (this.scene.get(this.gk) as any)?.cfg ?? {};
     const c1 = getChar(mc.p1), c2 = getChar(mc.p2);
     for (const [i, key, x] of [[0, c1.tex, -W / 2 + 30], [1, c2.tex, W / 2 - 30]] as [number, string, number][]) {
       const fg = this.add.graphics();
@@ -499,7 +510,7 @@ export class HudScene extends Phaser.Scene {
   // ------------------------------------------------------------ pausa
   private showPause() {
     if (this.standalone || this.pauseUi) return;
-    if (this.scene.isActive('Match')) this.scene.pause('Match');
+    if (this.scene.isActive(this.gk)) this.scene.pause(this.gk);
     const w = this.scale.width, h = this.scale.height;
     const c = this.add.container(0, 0).setDepth(90);
     c.add(this.add.rectangle(0, 0, w, h, 0x0b1a2a, 0.6).setOrigin(0).setInteractive());
@@ -508,7 +519,7 @@ export class HudScene extends Phaser.Scene {
       ['CONTINUAR', 'play', UI.green, () => this.resume()],
       ['CÓMO JUGAR', 'check', UI.teal, () => { this.pauseUi?.destroy(); this.pauseUi = undefined; this.startTutorial(); }],
       ['AJUSTES', 'gear', UI.orange, () => { this.pauseUi?.destroy(); this.pauseUi = undefined; this.scene.launch('Settings', { from: 'hud' }); this.scene.bringToTop('Settings'); }],
-      ['MENÚ', 'home', UI.blue, () => { this.scene.resume('Match'); this.backToMenu(); }],
+      ['MENÚ', 'home', UI.blue, () => { this.scene.resume(this.gk); this.backToMenu(); }],
     ];
     items.forEach(([t, ic, col, cb], i) => p.add(button(this, 0, -150 + i * 96, 400, 78, t, cb, { color: col, icon: ic, size: 32 }).c));
     c.add(p);
@@ -519,7 +530,7 @@ export class HudScene extends Phaser.Scene {
 
   private resume() {
     this.pauseUi?.destroy(); this.pauseUi = undefined;
-    if (this.scene.isPaused('Match')) this.scene.resume('Match');
+    if (this.scene.isPaused(this.gk)) this.scene.resume(this.gk);
   }
 
   // ------------------------------------------------------------ caras
@@ -539,7 +550,7 @@ export class HudScene extends Phaser.Scene {
     this.names[1].setText(d.names[1]);
     this.serving = !!d.serving;
     if (this.meterActive) return;
-    if (d.serving) this.hint.setText(this.touch ? 'Toca GOLPE para lanzar la bola' : 'Pulsa J o ESPACIO para lanzar la bola');
+    if (d.serving) this.hint.setText(d.serveText ? (this.touch ? d.serveText : d.serveText.replace('Toca GOLPE', 'Pulsa J o ESPACIO')) : this.touch ? 'Toca GOLPE para lanzar la bola' : 'Pulsa J o ESPACIO para lanzar la bola');
     else this.hint.setText('');
   }
 
@@ -600,7 +611,7 @@ export class HudScene extends Phaser.Scene {
     const pg = this.add.graphics();
     block(pg, -290, -170, 170, 190, won ? UI.orange : UI.teal);
     cutRect(pg, -280, -160, 150, 170, 0x8fd3f5, 1, 4);
-    const mc2 = (this.scene.get('Match') as any)?.cfg ?? {};
+    const mc2 = (this.scene.get(this.gk) as any)?.cfg ?? {};
     const hk = getChar(won ? mc2.p1 : mc2.p2).tex;
     const head = this.add.image(-205, 4, hk, this.textures.get(hk).has('head_laugh') ? 'head_laugh' : 'head_happy').setOrigin(0.5, 1).setScale(3.7).setFlipX(!won);
     const tg = this.add.graphics();
@@ -615,12 +626,12 @@ export class HudScene extends Phaser.Scene {
       block(rg, -80, yy - 20, 340, 40, UI.inkSoft, { shadow: false, border: 3 });
       p.add([rg, label(this, -60, yy, k, 24).setOrigin(0, 0.5), label(this, 238, yy, v, 26, '#ffd23f').setOrigin(1, 0.5)]);
     });
-    const mcfg = (this.scene.get('Match') as any).cfg;
+    const mcfg = (this.scene.get(this.gk) as any).cfg;
     if (mcfg?.tournament) {
       reportResult(won, d.score.a, d.score.b);
-      p.add(button(this, 0, 172, 380, 78, 'VER EL CUADRO', () => { this.scene.stop('Match'); this.scene.start('Match', { mode: 'attract', venue: mcfg.venue }); this.scene.launch('Bracket'); this.scene.stop(); }, { color: UI.orange, icon: 'trophy', size: 30 }).c);
+      p.add(button(this, 0, 172, 380, 78, 'VER EL CUADRO', () => { this.scene.stop(this.gk); this.scene.start('Match', { mode: 'attract', venue: mcfg.venue }); this.scene.launch('Bracket'); this.scene.stop(); }, { color: UI.orange, icon: 'trophy', size: 30 }).c);
     } else {
-      p.add(button(this, -150, 172, 270, 78, 'REVANCHA', () => { const m = this.scene.get('Match') as any; m.scene.restart(m.cfg); this.scene.restart(); }, { color: UI.orange, icon: 'retry', size: 30 }).c);
+      p.add(button(this, -150, 172, 270, 78, 'REVANCHA', () => { const m = this.scene.get(this.gk) as any; m.scene.restart(m.cfg); this.scene.restart(); }, { color: UI.orange, icon: 'retry', size: 30 }).c);
       p.add(button(this, 150, 172, 270, 78, 'MENÚ', () => this.backToMenu(), { color: UI.blue, icon: 'home', size: 30 }).c);
     }
     c.add(p);
@@ -631,6 +642,7 @@ export class HudScene extends Phaser.Scene {
 
   private backToMenu() {
     clearTournament();
+    this.scene.stop('Foot');
     this.scene.stop('Match');
     this.scene.start('Match', { mode: 'attract' });
     this.scene.launch('Menu');

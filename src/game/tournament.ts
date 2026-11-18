@@ -14,6 +14,7 @@ export interface Tournament {
   points: number;
   champion?: string;
   eliminated?: boolean;
+  sport: 'palas' | 'futvoley';
 }
 
 export const ROUND_NAMES = ['CUARTOS DE FINAL', 'SEMIFINAL', 'GRAN FINAL'];
@@ -24,7 +25,7 @@ let current: Tournament | null = null;
 export function getTournament() { return current; }
 export function clearTournament() { current = null; }
 
-export function startTournament(player: string, points: number): Tournament {
+export function startTournament(player: string, points: number, sport: 'palas' | 'futvoley' = 'palas'): Tournament {
   const ids = getRoster().map((c) => c.id).filter((id) => id !== player);
   for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
   const field = [player, ...ids.slice(0, 7)];
@@ -32,7 +33,7 @@ export function startTournament(player: string, points: number): Tournament {
   // la jugadora va en el primer partido; el resto, emparejado en orden aleatorio
   const quarters: Match[] = [];
   for (let i = 0; i < 8; i += 2) quarters.push({ a: field[i], b: field[i + 1] });
-  current = { player, rounds: [quarters, [], []], round: 0, points };
+  current = { player, rounds: [quarters, [], []], round: 0, points, sport };
   return current;
 }
 

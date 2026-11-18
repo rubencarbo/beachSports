@@ -10,6 +10,7 @@ import { LabScene } from './scenes/LabScene';
 import { SelectScene } from './scenes/SelectScene';
 import { BracketScene } from './scenes/BracketScene';
 import { CharStudioScene } from './scenes/CharStudioScene';
+import { FootScene } from './scenes/FootScene';
 import { initBackend } from './services/backend';
 import { GradePipeline, RetroPipeline } from './fx/RetroPipeline';
 
@@ -28,7 +29,7 @@ const game = new Phaser.Game({
   pipeline: { RetroPipeline, GradePipeline } as any,
   fps: { target: 60 },
   input: { activePointers: 4 },
-  scene: [BootScene, MatchScene, MenuScene, HudScene, SettingsScene, LabScene, SelectScene, BracketScene, CharStudioScene],
+  scene: [BootScene, MatchScene, MenuScene, HudScene, SettingsScene, LabScene, SelectScene, BracketScene, CharStudioScene, FootScene],
 });
 
 initBackend();

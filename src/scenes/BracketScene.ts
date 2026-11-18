@@ -109,7 +109,7 @@ export class BracketScene extends Phaser.Scene {
       p.add(button(this, pw / 2 - 170, by, 300, 78, '¡A JUGAR!', () => this.play(t), { color: UI.orange, icon: 'play', size: 30 }).c);
       p.add(button(this, pw / 2 - 420, by, 180, 62, 'ABANDONAR', () => this.exit(), { color: UI.grey, size: 20 }).c);
     } else {
-      const msg = t.champion === t.player ? '¡Has ganado el torneo de palas!' : t.eliminated ? g(me, 'Has quedado eliminada. ¡A por la revancha!', 'Has quedado eliminado. ¡A por la revancha!') : '';
+      const msg = t.champion === t.player ? (t.sport === 'futvoley' ? '¡Has ganado el torneo de futvóley!' : '¡Has ganado el torneo de palas!') : t.eliminated ? g(me, 'Has quedado eliminada. ¡A por la revancha!', 'Has quedado eliminado. ¡A por la revancha!') : '';
       p.add(label(this, -pw / 2 + 40, by, msg, 26).setOrigin(0, 0.5));
       p.add(button(this, pw / 2 - 170, by, 300, 78, 'MENÚ', () => this.exit(), { color: UI.blue, icon: 'home', size: 30 }).c);
     }
@@ -119,8 +119,11 @@ export class BracketScene extends Phaser.Scene {
     const m = playerMatch(t)!;
     const rival = m.a === t.player ? m.b : m.a;
     this.scene.stop('Match');
-    this.scene.start('Match', { mode: 'play', points: t.points, p1: t.player, p2: rival, venue: venueFor(t.round), difficulty: ROUND_DIFF[t.round], tournament: true });
-    this.scene.launch('Hud', { edit: false, standalone: false });
+    const common = { mode: 'play', points: t.points, venue: venueFor(t.round), difficulty: ROUND_DIFF[t.round], tournament: true };
+    const key = t.sport === 'futvoley' ? 'Foot' : 'Match';
+    if (key === 'Foot') this.scene.start('Foot', { ...common, format: '1v1', team1: [t.player], team2: [rival] });
+    else this.scene.start('Match', { ...common, p1: t.player, p2: rival });
+    this.scene.launch('Hud', { edit: false, standalone: false, game: key });
     this.scene.bringToTop('Hud');
     this.scene.stop();
   }

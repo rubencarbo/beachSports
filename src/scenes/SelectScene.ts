@@ -5,7 +5,7 @@ import { startTournament, venueFor } from '../game/tournament';
 import { VENUES } from '../game/venues';
 import { UI, block, button, cutRect, label, panel, shade } from '../ui/kit';
 
-export interface SelectConfig { mode: 'friendly' | 'tournament'; difficulty: 'facil' | 'normal' | 'dificil'; points: number }
+export interface SelectConfig { mode: 'friendly' | 'tournament'; difficulty: 'facil' | 'normal' | 'dificil'; points: number; sport?: 'palas' | 'futvoley'; format?: '1v1' | '2v2' }
 
 /** Elección de personaje (y, en amistoso, rival y sede) antes del partido. */
 export class SelectScene extends Phaser.Scene {
@@ -13,7 +13,8 @@ export class SelectScene extends Phaser.Scene {
   private pick = 'sol';
   private rival = 'random';
   private venue = 'mediodia';
-  private step: 'player' | 'rival' = 'player';
+  private step: 'player' | 'partner' | 'rival' = 'player';
+  private partner = 'random';
   private root!: Phaser.GameObjects.Container;
 
   constructor() { super('Select'); }
@@ -21,6 +22,7 @@ export class SelectScene extends Phaser.Scene {
   init(d: SelectConfig) {
     this.cfg = d;
     this.step = 'player';
+    this.partner = 'random';
     try { this.pick = localStorage.getItem('beachsports.lastChar') || 'sol'; } catch { this.pick = 'sol'; }
     if (!getRoster().some((c) => c.id === this.pick)) this.pick = 'sol';
   }
@@ -38,12 +40,13 @@ export class SelectScene extends Phaser.Scene {
     const w = this.scale.width, h = this.scale.height;
     const c = this.root;
     c.add(this.add.rectangle(0, 0, w, h, 0x0b1a2a, 0.62).setOrigin(0).setInteractive());
-    const choosingRival = this.step === 'rival';
-    const title = choosingRival ? 'ELIGE RIVAL Y SEDE' : this.cfg.mode === 'tournament' ? 'TORNEO · ELIGE PERSONAJE' : 'ELIGE TU PERSONAJE';
+    const choosingRival = this.step !== 'player';
+    const partnerStep = this.step === 'partner';
+    const title = partnerStep ? 'ELIGE TU COMPAÑERO/A' : choosingRival ? (this.cfg.format === '2v2' ? 'ELIGE RIVAL (CAPITÁN) Y SEDE' : 'ELIGE RIVAL Y SEDE') : this.cfg.mode === 'tournament' ? 'TORNEO · ELIGE PERSONAJE' : 'ELIGE TU PERSONAJE';
     const pw = w - 60, ph = h - 50;
     const p = panel(this, w / 2, h / 2 + 14, pw, ph, { title, titleColor: choosingRival ? UI.teal : UI.orange, wood: true });
     c.add(p);
-    const sel = choosingRival ? this.rival : this.pick;
+    const sel = partnerStep ? this.partner : choosingRival ? this.rival : this.pick;
     const roster = getRoster();
     const chosen = sel === 'random' ? null : getChar(sel);
 
@@ -85,13 +88,13 @@ export class SelectScene extends Phaser.Scene {
     const cw = (gw - (cols - 1) * 12) / cols;
     const rowsN = Math.ceil(items.length / cols);
     const gridTop = -ph / 2 + 54;
-    const gridH = choosingRival ? ph - 330 : ph - 190;
+    const gridH = choosingRival && !partnerStep ? ph - 330 : ph - 190;
     const chh = Math.min(cw * 1.15, (gridH - (rowsN - 1) * 12) / rowsN);
     items.forEach((ch, i) => {
       const x = gx0 + (i % cols) * (cw + 12), y = gridTop + Math.floor(i / cols) * (chh + 12);
       const id = ch ? ch.id : 'random';
       const isSel = id === sel;
-      const taken = choosingRival && ch && ch.id === this.pick;
+      const taken = choosingRival && ch && (ch.id === this.pick || (!partnerStep && ch.id === this.partner));
       const g = this.add.graphics();
       block(g, x, y, cw, chh, isSel ? UI.yellow : ch ? shade(ch.color, 0.75) : UI.grey, { depth: isSel ? 0 : 4 });
       cutRect(g, x + 8, y + 8, cw - 16, chh - 40, 0x8fd3f5, 1, 4);
@@ -109,14 +112,14 @@ export class SelectScene extends Phaser.Scene {
       const hit = this.add.rectangle(x + cw / 2, y + chh / 2, cw, chh, 0, 0).setInteractive({ useHandCursor: true });
       hit.on('pointerup', () => {
         if (taken) return;
-        if (choosingRival) this.rival = id; else this.pick = id;
+        if (partnerStep) this.partner = id; else if (choosingRival) this.rival = id; else this.pick = id;
         this.build();
       });
       p.add(hit);
     });
 
     // sedes (sólo amistoso, paso de rival)
-    if (choosingRival) {
+    if (choosingRival && !partnerStep) {
       const vy = gridTop + gridH + 26;
       p.add(label(this, gx0, vy, 'SEDE', 24).setOrigin(0, 0.5));
       const vw = (gw - 100 - 2 * 12) / 3;
@@ -129,28 +132,45 @@ export class SelectScene extends Phaser.Scene {
     // botones inferiores
     const by = ph / 2 - 52;
     p.add(button(this, -pw / 2 + 140, by, 220, 70, 'ATRÁS', () => this.back(), { color: UI.grey, size: 24 }).c);
-    const next = this.cfg.mode === 'friendly' && !choosingRival ? 'SIGUIENTE' : this.cfg.mode === 'tournament' ? '¡AL TORNEO!' : '¡JUGAR!';
+    const next = this.cfg.mode === 'friendly' && this.step !== 'rival' ? 'SIGUIENTE' : this.cfg.mode === 'tournament' ? '¡AL TORNEO!' : '¡JUGAR!';
     p.add(button(this, pw / 2 - 180, by, 300, 78, next, () => this.next(), { color: UI.orange, icon: 'play', size: 30 }).c);
   }
 
   private back() {
-    if (this.step === 'rival') { this.step = 'player'; this.build(); return; }
+    if (this.step === 'rival') { this.step = this.cfg.format === '2v2' ? 'partner' : 'player'; this.build(); return; }
+    if (this.step === 'partner') { this.step = 'player'; this.build(); return; }
     this.scene.launch('Menu');
     this.scene.stop();
   }
 
   private next() {
     try { localStorage.setItem('beachsports.lastChar', this.pick); } catch { /* ignorar */ }
+    const duo = this.cfg.format === '2v2';
     if (this.cfg.mode === 'friendly') {
-      if (this.step === 'player') { this.step = 'rival'; this.build(); return; }
-      const rival = this.rival === 'random' ? randomChar([this.pick]).id : this.rival;
+      if (this.step === 'player') { this.step = duo ? 'partner' : 'rival'; this.build(); return; }
+      if (this.step === 'partner') { this.step = 'rival'; this.build(); return; }
+      const mate = this.partner === 'random' ? randomChar([this.pick]).id : this.partner;
+      const rival = this.rival === 'random' ? randomChar([this.pick, mate]).id : this.rival;
+      if (this.cfg.sport === 'futvoley') {
+        const team2 = duo ? [rival, randomChar([this.pick, mate, rival]).id] : [rival];
+        this.launchFoot({ team1: duo ? [this.pick, mate] : [this.pick], team2 });
+        return;
+      }
       this.launchMatch({ p1: this.pick, p2: rival, venue: this.venue, difficulty: this.cfg.difficulty, tournament: false });
       return;
     }
-    startTournament(this.pick, this.cfg.points);
+    startTournament(this.pick, this.cfg.points, this.cfg.sport ?? 'palas');
     this.scene.launch('Bracket');
     this.scene.stop();
     void venueFor;
+  }
+
+  private launchFoot(o: { team1: string[]; team2: string[] }) {
+    this.scene.stop('Match');
+    this.scene.start('Foot', { mode: 'play', points: this.cfg.points, difficulty: this.cfg.difficulty, format: this.cfg.format ?? '1v1', venue: this.venue, tournament: false, ...o });
+    this.scene.launch('Hud', { edit: false, standalone: false, game: 'Foot' });
+    this.scene.bringToTop('Hud');
+    this.scene.stop();
   }
 
   private launchMatch(o: { p1: string; p2: string; venue: string; difficulty: string; tournament: boolean }) {

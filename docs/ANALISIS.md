@@ -132,7 +132,24 @@ Comparación del mismo fotograma a 848×528:
   2. Importador en el navegador (`charImport.ts`, versión en TypeScript de `ingest_parts.py`): detecta el tamaño de píxel, quita el croma, separa piezas (y cabezas que se tocan), propone el papel de cada pieza con desplegables para corregirlo, parte brazo y pierna, crea el atlas y lo guarda en el dispositivo.
   3. Lista de personajes importados, con opción de borrar.
 
-## 13. Siguientes pasos
+## 13. Futvóley (1 vs 1 y 2 vs 2)
+- **Escena propia** (`src/scenes/FootScene.ts`) que reutiliza escenario, cámara, efectos, esqueleto, HUD (`game: 'Foot'`) y torneo (`sport: 'futvoley'`).
+- **Equipos de 1 o 2 por lado.** En 2 vs 2, el compañero del usuario y los rivales son la máquina.
+- **Reglas:**
+  - Hasta 3 toques por equipo; un 4.º es falta.
+  - Punto si el balón toca la arena: para el rival si cae en tu campo y contra quien lo envió si sale fuera.
+  - La red no es falta.
+  - Al recuperar el saque rota el sacador.
+- **Toques según la altura del balón:** pie (empeine), pecho, cabeza o *shark attack* (remate en tijera en el aire).
+  - Acción por número de toque: control (1.º), levantada junto a la red (2.º) y ataque (3.º).
+  - Dirección hacia la red = atacar antes; hacia atrás = globo.
+  - Con la barra llena, ★ = chilena especial.
+- **Receptor:** quien jugará cada balón se decide por la predicción de la trayectoria (el más cercano o, en 2 vs 2, el que no tocó la última vez). Quien no juega se coloca en su sitio (defensa repartida o atacante junto a la red).
+- **IA por dificultad:** reacción, velocidad, calidad, probabilidad de *shark attack* y de especial, ataque temprano y probabilidad de llegar a defender (más baja contra remates).
+- **Saque con el pie** desde la arena, con la misma barra de potencia de dos toques.
+- **Balón** más grande y con paneles. Red a 2,05 m. Poses nuevas: patada, cabezazo, pecho, tijera y saque con el pie, con guardia y carrera sin pala.
+
+## 14. Siguientes pasos
 1. Multijugador online 1 vs 1 con Firebase Realtime Database (más baja latencia que Firestore). Modelo autoritativo del que saca, enviando solo los eventos de golpe (posición + velocidad), ya que la trayectoria es determinista.
 2. Vóley playa: `touchesPerSide: 3` y controles de recepción, colocación y remate. Futvóley: mismos toques usando el cuerpo. El escenario, la cámara, los efectos y el público se reutilizan tal cual.
 3. Arte final en sprite sheets, música, ranking global y personajes desbloqueables.

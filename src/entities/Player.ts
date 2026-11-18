@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { COURT, PHYS, RIG_SCALE, depthFor, project } from '../config';
-import { ANIM, Rig, RigInput } from './Rig';
+import { ANIM, Rig, RigInput, SwingKind } from './Rig';
 import type { Side } from '../sports/types';
 import type { Theme } from './Ball';
 import type { CharDef } from '../game/roster';
@@ -13,7 +13,7 @@ export interface Intent {
   special: boolean;
 }
 
-export type SwingType = 'fore' | 'over' | 'serve';
+export type SwingType = SwingKind;
 type Stage = 'none' | 'windup' | 'snap' | 'follow' | 'recover';
 
 /** Tiempos del golpe (s), medidos sobre el vídeo de referencia. */
@@ -59,7 +59,7 @@ export class Player {
   powerMul = 1;
   controlBonus = 0;
 
-  constructor(scene: Phaser.Scene, public side: Side, public char: CharDef) {
+  constructor(scene: Phaser.Scene, public side: Side, public char: CharDef, opts: { noPaddle?: boolean } = {}) {
     this.x = side * 5.5;
     this.z = 4;
     this.facing = -side;
@@ -69,7 +69,7 @@ export class Player {
     this.powerMul = 1 - (char.stats.power - 3) * 0.05; // <1 = vuelo más corto = golpe más rápido
     this.controlBonus = (char.stats.control - 3) * 0.05;
     this.shadow = scene.add.image(0, 0, 'shadow').setDepth(98);
-    this.rig = new Rig(scene, char.tex, char.data);
+    this.rig = new Rig(scene, char.tex, char.data, opts);
   }
 
   get airborne() { return this.y > 0.05; }
@@ -160,7 +160,7 @@ export class Player {
     if (this.stage !== 'none') {
       this.stageT += dt;
       const T = SWING_TIMES;
-      const wmax = this.swingType === 'serve' ? 3 : T.windupMax; // en el saque espera al segundo toque
+      const wmax = this.swingType === 'serve' || this.swingType === 'fkserve' ? 3 : T.windupMax; // en el saque espera al segundo toque
       if (this.stage === 'windup' && this.stageT > wmax) { this.stage = 'snap'; this.stageT = 0; }
       else if (this.stage === 'snap' && this.stageT > T.snap) { this.stage = 'follow'; this.stageT = 0; }
       else if (this.stage === 'follow' && this.stageT > T.follow) { this.stage = 'recover'; this.stageT = 0; }
