@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { sfx } from '../core/audio';
 import { applyRetro } from '../fx/RetroPipeline';
-import { getChar } from '../game/roster';
+import { g, getChar } from '../game/roster';
 import { ROUND_DIFF, ROUND_NAMES, Tournament, clearTournament, getTournament, playerMatch, venueFor } from '../game/tournament';
 import { getVenue } from '../game/venues';
 import { UI, block, button, cutRect, icon, label, panel } from '../ui/kit';
@@ -37,7 +37,8 @@ export class BracketScene extends Phaser.Scene {
     c.add(this.add.rectangle(0, 0, w, h, 0x0b1a2a, 0.62).setOrigin(0).setInteractive());
     if (!t) return;
     const done = t.round >= 3;
-    const title = done ? (t.champion === t.player ? '¡CAMPEONA!' : 'TORNEO TERMINADO') : ROUND_NAMES[t.round];
+    const me = getChar(t.player);
+    const title = done ? (t.champion === t.player ? g(me, '¡CAMPEONA!', '¡CAMPEÓN!') : 'TORNEO TERMINADO') : ROUND_NAMES[t.round];
     const pw = w - 60, ph = h - 50;
     const p = panel(this, w / 2, h / 2 + 14, pw, ph, { title, titleColor: done && t.champion === t.player ? UI.yellow : UI.orange, wood: true });
     c.add(p);
@@ -95,7 +96,7 @@ export class BracketScene extends Phaser.Scene {
       const head = this.add.image(tx + pw * 0.11, ty + 70, ch.tex, 'head_happy').setOrigin(0.5, 1);
       head.setScale(80 / head.height);
       p.add([head, label(this, tx + pw * 0.11, ty + 92, ch.name, 22, '#1b2240', { stroke: '#fff3d6' })]);
-    } else p.add(label(this, tx + pw * 0.11, ty + 50, 'CAMPEONA', 20));
+    } else p.add(label(this, tx + pw * 0.11, ty + 50, 'CAMPEÓN/A', 20));
 
     // pie: sede de la siguiente ronda y botones
     const by = ph / 2 - 50;
@@ -108,7 +109,7 @@ export class BracketScene extends Phaser.Scene {
       p.add(button(this, pw / 2 - 170, by, 300, 78, '¡A JUGAR!', () => this.play(t), { color: UI.orange, icon: 'play', size: 30 }).c);
       p.add(button(this, pw / 2 - 420, by, 180, 62, 'ABANDONAR', () => this.exit(), { color: UI.grey, size: 20 }).c);
     } else {
-      const msg = t.champion === t.player ? '¡Has ganado el torneo de palas!' : t.eliminated ? 'Has quedado eliminada. ¡A por la revancha!' : '';
+      const msg = t.champion === t.player ? '¡Has ganado el torneo de palas!' : t.eliminated ? g(me, 'Has quedado eliminada. ¡A por la revancha!', 'Has quedado eliminado. ¡A por la revancha!') : '';
       p.add(label(this, -pw / 2 + 40, by, msg, 26).setOrigin(0, 0.5));
       p.add(button(this, pw / 2 - 170, by, 300, 78, 'MENÚ', () => this.exit(), { color: UI.blue, icon: 'home', size: 30 }).c);
     }

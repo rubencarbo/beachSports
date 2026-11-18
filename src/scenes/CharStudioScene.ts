@@ -93,7 +93,7 @@ export class CharStudioScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- 1. prompt
   private renderPrompt(body: HTMLElement) {
-    body.append(el('div', 'note', 'Elige cómo será tu jugadora y copia el texto. Pégalo en tu generador de imágenes (en una conversación NUEVA). Si puedes, adjunta también una captura de una jugadora del juego como referencia de estilo. Después ve a «2 · IMPORTAR» con la imagen que obtengas.'));
+    body.append(el('div', 'note', 'Elige cómo será tu personaje (chica o chico) y copia el texto. Pégalo en tu generador de imágenes (en una conversación NUEVA). Si puedes, adjunta también una captura de una jugadora del juego como referencia de estilo. Después ve a «2 · IMPORTAR» con la imagen que obtengas.'));
     const grid = el('div', 'grid');
     const s = this.spec;
     const save = () => { try { localStorage.setItem('beachsports.spec', JSON.stringify(this.spec)); } catch { /* ignorar */ } ta.value = buildPrompt(this.spec); };
@@ -173,6 +173,9 @@ export class CharStudioScene extends Phaser.Scene {
     const form = el('div', 'grid');
     const name = document.createElement('input'); name.type = 'text'; name.id = 'bs-iname'; name.maxLength = 10; name.value = this.spec.name;
     const nl = el('label', '', 'Nombre'); nl.append(name); form.append(nl);
+    const gen = document.createElement('select'); gen.id = 'bs-gen';
+    for (const [v, t] of [['f', 'Chica'], ['m', 'Chico']]) { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((this.spec.gender === 'boy' ? 'm' : 'f') === v) o.selected = true; gen.append(o); }
+    const gl = el('label', '', 'Personaje'); gl.append(gen); form.append(gl);
     const elem = document.createElement('select'); elem.id = 'bs-elem';
     for (const [v, t] of [['sun', 'Fuego'], ['wave', 'Agua']]) { const o = document.createElement('option'); o.value = v; o.textContent = t; elem.append(o); }
     const el2 = el('label', '', 'Golpe especial'); el2.append(elem); form.append(el2);
@@ -188,11 +191,11 @@ export class CharStudioScene extends Phaser.Scene {
     save.onclick = async () => {
       const { png, frames } = buildAtlas(this.pieces);
       const id = `c${Date.now().toString(36)}`;
-      const c = { id, name: (name.value || 'Jugadora').toUpperCase(), element: elem.value as 'sun' | 'wave', style: style.value, png, frames };
+      const c = { id, name: (name.value || 'Jugador').toUpperCase(), element: elem.value as 'sun' | 'wave', style: style.value, png, frames, gender: gen.value as 'f' | 'm' };
       const list = [...loadCustom(), c];
       if (!saveCustom(list)) { msg.textContent = 'No hay espacio para guardar en este dispositivo.'; return; }
       await registerCustom(this, c);
-      this.pieces = []; this.status = `¡${c.name} guardada! Ya puedes elegirla al empezar un partido.`;
+      this.pieces = []; this.status = `¡${c.name} guardada! Ya puedes elegir este personaje al empezar un partido.`;
       this.tab = 'mine'; this.render();
     };
     row2.append(save, msg);

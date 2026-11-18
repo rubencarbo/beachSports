@@ -13,7 +13,7 @@ import Phaser from 'phaser';
  */
 
 export interface RigFrame { x: number; y: number; w: number; h: number; top: [number, number]; bot: [number, number] }
-export interface RigData { pixel: number; frames: Record<string, RigFrame> }
+export interface RigData { pixel: number; frames: Record<string, RigFrame>; scale?: { head?: number; leg?: number } }
 
 export function registerRigFrames(scene: Phaser.Scene, key: string, data: RigData) {
   const tex = scene.textures.get(key);
@@ -133,7 +133,12 @@ export class Rig {
   private lastHeadY = 0;
   height: number;
 
+  private hk = 1;
+  private lk = 1;
+
   constructor(scene: Phaser.Scene, key: string, data: RigData) {
+    this.hk = data.scale?.head ?? 1;
+    this.lk = data.scale?.leg ?? 1;
     this.F = data.frames;
     this.height = data.frames.full?.h ?? 120;
     this.container = scene.add.container(0, 0);
@@ -181,7 +186,7 @@ export class Rig {
     if (P_.frame.name === frame && P_.getData('ok')) return;
     P_.setData('ok', true);
     const hf = this.F[frame];
-    P_.setFrame(frame).setOrigin(hf.bot[0] / hf.w, hf.bot[1] / hf.h).setScale(ANIM.headScale);
+    P_.setFrame(frame).setOrigin(hf.bot[0] / hf.w, hf.bot[1] / hf.h).setScale(ANIM.headScale * this.hk);
   }
 
   /** Calcula la pose objetivo y la velocidad de mezcla. */
@@ -233,7 +238,7 @@ export class Rig {
 
   private layout(p: Pose, dt: number) {
     const F = this.F, Q = this.parts, A = this.A;
-    const LS = ANIM.legScale;
+    const LS = ANIM.legScale * this.lk;
     const len = (f: RigFrame) => f.bot[1] - f.top[1];
     const dir = (a: number) => ({ x: Math.sin(a), y: Math.cos(a) });
     const THIGH = (len(F.thigh) - 1) * LS, SHIN = (F.lowerleg.h - F.lowerleg.top[1] - 2) * LS;
@@ -277,9 +282,9 @@ export class Rig {
       this.tuftVel += force * dt;
       this.tuftAng = Phaser.Math.Clamp(this.tuftAng + this.tuftVel * dt, -0.5, 0.5);
       const hr = r * 0.5 - p.head;
-      const back = { x: -10 * ANIM.headScale, y: -20 * ANIM.headScale };
+      const back = { x: -10 * ANIM.headScale * this.hk, y: -20 * ANIM.headScale * this.hk };
       Q.tuft.setPosition(neck.x + back.x * Math.cos(hr) - back.y * Math.sin(hr), neck.y + back.x * Math.sin(hr) + back.y * Math.cos(hr))
-        .setRotation(hr + this.tuftAng).setScale(ANIM.headScale);
+        .setRotation(hr + this.tuftAng).setScale(ANIM.headScale * this.hk);
     }
 
     // brazos

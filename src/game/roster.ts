@@ -3,9 +3,10 @@ import type { Theme } from '../entities/Ball';
 import { RigData, registerRigFrames } from '../entities/Rig';
 import rigSunJson from '../assets/rig_sun.json';
 import rigWaveJson from '../assets/rig_wave.json';
+import rigBoyJson from '../assets/rig_boy.json';
 
 /**
- * Catálogo de jugadoras. Dos hojas base (Sol, Ola) + variantes de color generadas en el
+ * Catálogo de jugadoras y jugadores. Tres hojas base (Sol, Ola, Toni) + variantes de color generadas en el
  * navegador + personajes importados por el usuario (guardados en el dispositivo).
  */
 
@@ -19,7 +20,11 @@ export interface CharDef {
   stats: CharStats;
   color: number; // color de la ficha
   builtin: boolean;
+  gender: 'f' | 'm';
 }
+
+/** Textos según el género del personaje. */
+export const g = (c: { gender: 'f' | 'm' }, f: string, m: string) => (c.gender === 'm' ? m : f);
 
 export const STYLES: Record<string, { label: string; stats: CharStats }> = {
   equilibrada: { label: 'EQUILIBRADA', stats: { speed: 3, power: 3, control: 4 } },
@@ -28,17 +33,19 @@ export const STYLES: Record<string, { label: string; stats: CharStats }> = {
   tecnica: { label: 'TÉCNICA', stats: { speed: 3, power: 2, control: 5 } },
 };
 
-interface Variant { id: string; name: string; base: 'sun' | 'wave'; hue: number | null; element: Theme; stats: CharStats; color: number }
+interface Variant { id: string; name: string; base: 'sun' | 'wave' | 'boy'; hue: number | null; element: Theme; stats: CharStats; color: number }
 
 const VARIANTS: Variant[] = [
   { id: 'sol', name: 'SOL', base: 'sun', hue: null, element: 'sun', stats: { speed: 3, power: 4, control: 3 }, color: 0xff8a1f },
+  { id: 'toni', name: 'TONI', base: 'boy', hue: null, element: 'wave', stats: { speed: 3, power: 4, control: 3 }, color: 0x1fb5c9 },
   { id: 'ola', name: 'OLA', base: 'wave', hue: null, element: 'wave', stats: { speed: 4, power: 3, control: 3 }, color: 0x1fb5c9 },
+  { id: 'marco', name: 'MARCO', base: 'boy', hue: 2, element: 'sun', stats: { speed: 2, power: 5, control: 3 }, color: 0xe8433a },
   { id: 'coral', name: 'CORAL', base: 'sun', hue: 335, element: 'sun', stats: { speed: 3, power: 3, control: 4 }, color: 0xff5a8a },
+  { id: 'leo', name: 'LEO', base: 'boy', hue: 42, element: 'sun', stats: { speed: 4, power: 3, control: 3 }, color: 0xffd23f },
   { id: 'lima', name: 'LIMA', base: 'sun', hue: 95, element: 'wave', stats: { speed: 5, power: 2, control: 3 }, color: 0x8ad13a },
+  { id: 'bruno', name: 'BRUNO', base: 'boy', hue: 275, element: 'wave', stats: { speed: 3, power: 2, control: 5 }, color: 0x9a5ad6 },
   { id: 'uva', name: 'UVA', base: 'sun', hue: 275, element: 'sun', stats: { speed: 2, power: 5, control: 3 }, color: 0x9a5ad6 },
-  { id: 'fresa', name: 'FRESA', base: 'wave', hue: 355, element: 'sun', stats: { speed: 3, power: 4, control: 3 }, color: 0xe8433a },
   { id: 'menta', name: 'MENTA', base: 'wave', hue: 150, element: 'wave', stats: { speed: 4, power: 2, control: 4 }, color: 0x3ad6a0 },
-  { id: 'noche', name: 'NOCHE', base: 'wave', hue: 228, element: 'wave', stats: { speed: 3, power: 3, control: 4 }, color: 0x3a5ad6 },
 ];
 
 const roster: CharDef[] = [];
@@ -71,7 +78,7 @@ function hsl2rgb(h: number, s: number, l: number): [number, number, number] {
 }
 
 /** Cambia el color de ropa/pelo/pala (no la piel) de una hoja de piezas, pieza a pieza. */
-function recolor(scene: Phaser.Scene, srcKey: string, dstKey: string, data: RigData, base: 'sun' | 'wave', hue: number) {
+function recolor(scene: Phaser.Scene, srcKey: string, dstKey: string, data: RigData, base: 'sun' | 'wave' | 'boy', hue: number) {
   const src = scene.textures.get(srcKey).getSourceImage() as HTMLImageElement;
   const tex = scene.textures.createCanvas(dstKey, src.width, src.height)!;
   const ctx = tex.getContext();
@@ -87,7 +94,9 @@ function recolor(scene: Phaser.Scene, srcKey: string, dstKey: string, data: RigD
     if (!f) continue;
     for (let y = f.y; y < f.y + f.h; y++) for (let x = f.x; x < f.x + f.w; x++) {
       const i = (y * src.width + x) * 4;
-      if (d[i + 3]) skin.add(q(d[i], d[i + 1], d[i + 2]));
+      if (!d[i + 3]) continue;
+      const hh = rgb2hsl(d[i], d[i + 1], d[i + 2])[0];
+      if (hh < 45 || hh > 340) skin.add(q(d[i], d[i + 1], d[i + 2])); // sólo tonos de piel (no mangas ni muñequeras)
     }
   }
   for (const [name, f] of Object.entries(data.frames)) {
@@ -120,7 +129,7 @@ function recolor(scene: Phaser.Scene, srcKey: string, dstKey: string, data: RigD
 }
 
 // ---------------------------------------------------------------------------------- personalizados
-export interface CustomChar { id: string; name: string; element: Theme; style: string; png: string; frames: RigData['frames'] }
+export interface CustomChar { id: string; name: string; element: Theme; style: string; png: string; frames: RigData['frames']; gender?: 'f' | 'm' }
 const KEY = 'beachsports.chars.v1';
 
 export function loadCustom(): CustomChar[] {
@@ -139,7 +148,7 @@ export function registerCustom(scene: Phaser.Scene, c: CustomChar): Promise<void
       registerRigFrames(scene, key, data);
       const st = STYLES[c.style] ?? STYLES.equilibrada;
       const idx = roster.findIndex((r) => r.id === c.id);
-      const def: CharDef = { id: c.id, name: c.name.toUpperCase().slice(0, 10), tex: key, data, element: c.element, stats: st.stats, color: c.element === 'sun' ? 0xff8a1f : 0x1fb5c9, builtin: false };
+      const def: CharDef = { id: c.id, name: c.name.toUpperCase().slice(0, 10), tex: key, data, element: c.element, stats: st.stats, color: c.element === 'sun' ? 0xff8a1f : 0x1fb5c9, builtin: false, gender: c.gender ?? 'f' };
       if (idx >= 0) roster[idx] = def; else roster.push(def);
       resolve();
     };
@@ -162,12 +171,12 @@ export function removeCustom(scene: Phaser.Scene, id: string) {
 /** Construye el catálogo (llamar en el arranque, con las hojas base ya cargadas). */
 export async function buildRoster(scene: Phaser.Scene) {
   roster.length = 0;
-  const data = { sun: rigSunJson as unknown as RigData, wave: rigWaveJson as unknown as RigData };
+  const data = { sun: rigSunJson as unknown as RigData, wave: rigWaveJson as unknown as RigData, boy: rigBoyJson as unknown as RigData };
   for (const v of VARIANTS) {
     const srcKey = `rig_${v.base}`;
     const key = v.hue === null ? srcKey : `rig_${v.id}`;
     if (v.hue !== null && !scene.textures.exists(key)) recolor(scene, srcKey, key, data[v.base], v.base, v.hue);
-    roster.push({ id: v.id, name: v.name, tex: key, data: data[v.base], element: v.element, stats: v.stats, color: v.color, builtin: true });
+    roster.push({ id: v.id, name: v.name, tex: key, data: data[v.base], element: v.element, stats: v.stats, color: v.color, builtin: true, gender: v.base === 'boy' ? 'm' : 'f' });
   }
   for (const c of loadCustom()) await registerCustom(scene, c);
 }

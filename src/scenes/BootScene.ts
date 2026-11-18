@@ -9,6 +9,8 @@ import rigWaveUrl from '../assets/rig_wave.png';
 import rigSunJson from '../assets/rig_sun.json';
 import rigWaveJson from '../assets/rig_wave.json';
 import crowdUrl from '../assets/crowd.png';
+import rigBoyUrl from '../assets/rig_boy.png';
+import rigBoyJson from '../assets/rig_boy.json';
 import crowdJson from '../assets/crowd.json';
 import { RigData, registerRigFrames } from '../entities/Rig';
 import { buildRoster } from '../game/roster';
@@ -21,6 +23,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('rig_sun', rigSunUrl);
     this.load.image('rig_wave', rigWaveUrl);
     this.load.image('crowd', crowdUrl);
+    this.load.image('rig_boy', rigBoyUrl);
   }
   create() {
     generateTextures(this);
@@ -28,6 +31,7 @@ export class BootScene extends Phaser.Scene {
     registerRigFrames(this, 'rig_sun', rigSunJson as unknown as RigData);
     registerRigFrames(this, 'rig_wave', rigWaveJson as unknown as RigData);
     registerRigFrames(this, 'crowd', crowdJson as unknown as RigData);
+    registerRigFrames(this, 'rig_boy', rigBoyJson as unknown as RigData);
     const go0 = () => {
       if (location.hash === '#lab') { this.scene.start('Lab'); return; }
       this.scene.start('Match', { mode: 'attract' });

@@ -39,7 +39,7 @@ export class SelectScene extends Phaser.Scene {
     const c = this.root;
     c.add(this.add.rectangle(0, 0, w, h, 0x0b1a2a, 0.62).setOrigin(0).setInteractive());
     const choosingRival = this.step === 'rival';
-    const title = choosingRival ? 'ELIGE RIVAL Y SEDE' : this.cfg.mode === 'tournament' ? 'TORNEO · ELIGE JUGADORA' : 'ELIGE TU JUGADORA';
+    const title = choosingRival ? 'ELIGE RIVAL Y SEDE' : this.cfg.mode === 'tournament' ? 'TORNEO · ELIGE PERSONAJE' : 'ELIGE TU PERSONAJE';
     const pw = w - 60, ph = h - 50;
     const p = panel(this, w / 2, h / 2 + 14, pw, ph, { title, titleColor: choosingRival ? UI.teal : UI.orange, wood: true });
     c.add(p);
