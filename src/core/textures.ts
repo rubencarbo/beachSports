@@ -367,47 +367,7 @@ export function generateTextures(scene: Phaser.Scene) {
       c.fillRect(0, 0, 80, h);
     });
   }
-  // siluetas suaves de público en primer plano (de espaldas, a contraluz), como en el vídeo
-  const sil = (c: CanvasRenderingContext2D, v: number, up: boolean, col: string, ox: number, oy: number) => {
-    c.save(); c.translate(ox, oy);
-    c.fillStyle = col; c.strokeStyle = col;
-    const cx = 130;
-    const kid = v === 4;
-    const hr = kid ? 50 : 62, hy = kid ? 150 : 128;
-    // hombros
-    c.beginPath(); c.ellipse(cx, 345, kid ? 100 : 128, 120, 0, 0, Math.PI * 2); c.fill();
-    c.fillRect(cx - 32, hy + 30, 64, 80);
-    // cabeza
-    c.beginPath(); c.ellipse(cx, hy, hr, hr * 1.12, 0, 0, Math.PI * 2); c.fill();
-    if (v === 1) { // gorra
-      c.beginPath(); c.ellipse(cx, hy - 26, hr + 6, 48, 0, Math.PI, 0); c.fill();
-      c.beginPath(); c.ellipse(cx + 52, hy - 22, 46, 10, 0.05, 0, Math.PI * 2); c.fill();
-    } else if (v === 2) { // melena
-      c.beginPath(); c.ellipse(cx, hy + 26, hr + 14, hr + 30, 0, 0, Math.PI * 2); c.fill();
-    } else if (v === 3) { // moño
-      c.beginPath(); c.arc(cx - 6, hy - hr - 12, 26, 0, Math.PI * 2); c.fill();
-    } else if (v === 5) { // pelo de punta
-      for (const [dx, h] of [[-40, 34], [-14, 44], [12, 42], [38, 30]]) { c.beginPath(); c.moveTo(cx + dx - 18, hy - hr + 16); c.lineTo(cx + dx + 18, hy - hr + 16); c.lineTo(cx + dx * 1.2, hy - hr - h); c.fill(); }
-    } else if (v === 6) { // cámara de fotos levantada
-      c.fillRect(cx + 40, hy - 30, 70, 46); c.beginPath(); c.arc(cx + 110, hy - 7, 20, 0, Math.PI * 2); c.fill();
-    }
-    if (up) {
-      c.lineCap = 'round'; c.lineWidth = 30;
-      c.beginPath(); c.moveTo(cx - 88, 290); c.quadraticCurveTo(cx - 130, 200, cx - 112, 120); c.stroke();
-      c.beginPath(); c.moveTo(cx + 88, 290); c.quadraticCurveTo(cx + 130, 200, cx + 112, 120); c.stroke();
-      c.beginPath(); c.arc(cx - 112, 112, 22, 0, Math.PI * 2); c.arc(cx + 112, 112, 22, 0, Math.PI * 2); c.fill();
-    }
-    c.restore();
-  };
-  for (let v = 0; v < 7; v++) {
-    for (const up of [false, true]) {
-      canvasTex(scene, `silS${v}${up ? 'b' : 'a'}`, 300, 420, (c) => {
-        sil(c, v, up, 'rgba(120,150,190,.55)', 0, 0); // contraluz arriba-izquierda
-        sil(c, v, up, '#121722', 5, 7);
-      });
-      scene.textures.get(`silS${v}${up ? 'b' : 'a'}`).setFilter(Phaser.Textures.FilterMode.LINEAR);
-    }
-  }
+  generateForeground(scene);
   // sombrilla y hamaca de la playa lejana
   canvasTex(scene, 'umbrella', 90, 80, (c, w, h) => {
     const cols = pick([['#ff5a5a', '#ffffff'], ['#3aa0ff', '#ffe066'], ['#ff9f1c', '#2ec4b6'], ['#7bd389', '#ffffff']]);
@@ -510,4 +470,198 @@ export function generateTextures(scene: Phaser.Scene) {
     if (scene.textures.exists(k)) scene.textures.get(k).setFilter(Phaser.Textures.FilterMode.LINEAR);
   }
 
+}
+
+// ---------------------------------------------------------------------------------------------
+// PRIMER PLANO: siluetas de público de espaldas y hoja de palmera, desenfocadas como si la
+// cámara enfocase a las jugadoras (profundidad de campo). El desenfoque gaussiano se calcula
+// una sola vez al arrancar (3 pasadas de desenfoque de caja = gaussiano), sin coste en partida.
+// ---------------------------------------------------------------------------------------------
+
+export const SIL_TYPES = 10;
+
+/** Desenfoque gaussiano aproximado (3 pasadas de caja separables) sobre RGBA premultiplicado. */
+function gaussianBlur(c: CanvasRenderingContext2D, w: number, h: number, r: number) {
+  const img = c.getImageData(0, 0, w, h);
+  const d = img.data;
+  const n = w * h;
+  const ch = [new Float32Array(n), new Float32Array(n), new Float32Array(n), new Float32Array(n)];
+  for (let i = 0; i < n; i++) {
+    const a = d[i * 4 + 3] / 255;
+    ch[0][i] = d[i * 4] * a; ch[1][i] = d[i * 4 + 1] * a; ch[2][i] = d[i * 4 + 2] * a; ch[3][i] = a;
+  }
+  const tmp = new Float32Array(n);
+  const box = (src: Float32Array, rr: number) => {
+    const k = 1 / (2 * rr + 1);
+    for (let y = 0; y < h; y++) { // horizontal
+      let acc = 0; const row = y * w;
+      for (let x = -rr; x <= rr; x++) acc += src[row + Math.min(w - 1, Math.max(0, x))];
+      for (let x = 0; x < w; x++) {
+        tmp[row + x] = acc * k;
+        acc += src[row + Math.min(w - 1, x + rr + 1)] - src[row + Math.max(0, x - rr)];
+      }
+    }
+    for (let x = 0; x < w; x++) { // vertical
+      let acc = 0;
+      for (let y = -rr; y <= rr; y++) acc += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+      for (let y = 0; y < h; y++) {
+        src[y * w + x] = acc * k;
+        acc += tmp[Math.min(h - 1, y + rr + 1) * w + x] - tmp[Math.max(0, y - rr) * w + x];
+      }
+    }
+  };
+  const rr = Math.max(1, Math.round(r / 1.7));
+  for (const arr of ch) for (let pass = 0; pass < 3; pass++) box(arr, rr);
+  for (let i = 0; i < n; i++) {
+    const a = ch[3][i];
+    d[i * 4 + 3] = Math.round(a * 255);
+    if (a > 0.001) { d[i * 4] = ch[0][i] / a; d[i * 4 + 1] = ch[1][i] / a; d[i * 4 + 2] = ch[2][i] / a; }
+  }
+  c.putImageData(img, 0, 0);
+}
+
+type ArmStyle = 'both' | 'one' | 'phone';
+
+/** Persona de espaldas (cabeza, orejas, cuello, hombros) con distintos peinados. */
+function person(c: CanvasRenderingContext2D, v: number, arms: ArmStyle | null) {
+  const cx = 220;
+  const kid = v === 8;
+  const S = kid ? 0.8 : 1;
+  const hy = kid ? 190 : 150; // centro de la cabeza
+  const hr = 54 * S; // radio de la cabeza
+  // hombros y torso: trapecio que baja desde el cuello hasta el hombro redondeado (deltoides)
+  const sw = (kid ? 104 : 132), sy = hy + hr + 40 * S;
+  const half = (sd: number) => {
+    c.moveTo(cx + sd * 30 * S, hy + hr * 0.7);
+    c.quadraticCurveTo(cx + sd * 44 * S, sy - 6, cx + sd * sw * 0.72, sy + 2); // trapecio
+    c.quadraticCurveTo(cx + sd * (sw + 8), sy + 8, cx + sd * (sw + 4), sy + 70); // hombro redondeado
+    c.lineTo(cx + sd * (sw + 14), 480);
+    c.lineTo(cx, 480);
+  };
+  c.beginPath(); half(-1); c.closePath(); c.fill();
+  c.beginPath(); half(1); c.closePath(); c.fill();
+  c.fillRect(cx - 34 * S, hy + hr * 0.6, 68 * S, 480);
+  // brazos animando: brazo y antebrazo gruesos, codo doblado hacia fuera, puño
+  if (arms) {
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const arm = (side: number, phone: boolean) => {
+      const shx = cx + side * (sw - 10), shy = sy + 26;
+      const elx = cx + side * (sw + 34), ely = hy + 20 * S;
+      const hx = cx + side * (sw + 6), hyy = hy - 92 * S;
+      c.lineWidth = 46 * S;
+      c.beginPath(); c.moveTo(shx, shy); c.lineTo(elx, ely); c.stroke();
+      c.lineWidth = 38 * S;
+      c.beginPath(); c.moveTo(elx, ely); c.lineTo(hx, hyy); c.stroke();
+      c.beginPath(); c.ellipse(hx, hyy - 14 * S, 24 * S, 28 * S, 0, 0, Math.PI * 2); c.fill(); // puño
+      if (phone) { c.save(); c.translate(hx - side * 4, hyy - 44 * S); c.rotate(side * 0.12); c.fillRect(-24, -46, 48, 78); c.restore(); }
+    };
+    if (arms === 'both') { arm(-1, false); arm(1, false); }
+    else if (arms === 'one') arm(1, false);
+    else arm(1, true);
+  }
+  // cuello
+  c.beginPath(); c.ellipse(cx, hy + hr * 0.75, 30 * S, 44 * S, 0, 0, Math.PI * 2); c.fill();
+  // orejas
+  if (v !== 6 && v !== 7) for (const sd of [-1, 1]) { c.beginPath(); c.ellipse(cx + sd * hr * 0.98, hy + 8 * S, 11 * S, 19 * S, sd * 0.15, 0, Math.PI * 2); c.fill(); }
+  // cabeza (un poco más ancha arriba, como un cráneo de espaldas)
+  c.beginPath(); c.ellipse(cx, hy, hr, hr * 1.12, 0, 0, Math.PI * 2); c.fill();
+  // peinados
+  switch (v) {
+    case 0: // pelo corto: volumen arriba y nuca irregular
+      c.beginPath(); c.ellipse(cx, hy - 10, hr + 5, hr * 1.02, 0, Math.PI, 0); c.fill();
+      for (let i = -3; i <= 3; i++) { c.beginPath(); c.arc(cx + i * 14, hy - hr + 6 + Math.abs(i) * 4, 13, 0, Math.PI * 2); c.fill(); }
+      break;
+    case 1: // calvo: sólo el cráneo (el contraluz lo marca)
+      break;
+    case 2: // gorra: copa + visera de lado y ajuste trasero
+      c.beginPath(); c.ellipse(cx, hy - 12, hr + 6, hr * 0.95, 0, Math.PI * 1.02, Math.PI * 1.98); c.fill();
+      c.fillRect(cx - hr - 6, hy - 14, (hr + 6) * 2, 16);
+      c.beginPath(); c.ellipse(cx + hr + 6, hy - 10, 30, 9, -0.12, 0, Math.PI * 2); c.fill();
+      break;
+    case 3: // coleta
+      c.beginPath(); c.ellipse(cx, hy - 8, hr + 4, hr * 1.06, 0, Math.PI, 0); c.fill();
+      c.beginPath(); c.moveTo(cx - 16, hy + 6); c.bezierCurveTo(cx - 34, hy + 70, cx + 26, hy + 90, cx + 6, hy + 150);
+      c.bezierCurveTo(cx + 44, hy + 100, cx + 28, hy + 40, cx + 16, hy + 6); c.fill();
+      break;
+    case 4: // moño
+      c.beginPath(); c.ellipse(cx, hy - 6, hr + 3, hr * 1.06, 0, Math.PI, 0); c.fill();
+      c.beginPath(); c.arc(cx + 4, hy - hr - 22, 30, 0, Math.PI * 2); c.fill();
+      break;
+    case 5: // rizos / afro
+      for (let i = 0; i < 18; i++) { const a = Math.PI * 0.95 + (i / 17) * Math.PI * 1.1; c.beginPath(); c.arc(cx + Math.cos(a) * (hr + 10), hy - 4 + Math.sin(a) * (hr + 14), 22, 0, Math.PI * 2); c.fill(); }
+      c.beginPath(); c.ellipse(cx, hy - 6, hr + 18, hr + 20, 0, 0, Math.PI * 2); c.fill();
+      break;
+    case 6: // melena hasta los hombros
+      c.beginPath(); c.moveTo(cx - hr - 10, hy);
+      c.bezierCurveTo(cx - hr - 20, hy + 90, cx - hr + 4, hy + 120, cx - hr + 20, hy + 128);
+      c.lineTo(cx + hr - 20, hy + 128);
+      c.bezierCurveTo(cx + hr - 4, hy + 120, cx + hr + 20, hy + 90, cx + hr + 10, hy);
+      c.closePath(); c.fill();
+      c.beginPath(); c.ellipse(cx, hy - 4, hr + 10, hr * 1.12, 0, 0, Math.PI * 2); c.fill();
+      break;
+    case 7: // sombrero de playa de ala ancha
+      c.beginPath(); c.ellipse(cx, hy - 26, hr + 52, 20, 0, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.ellipse(cx, hy - 40, hr - 4, 40, 0, Math.PI, 0); c.fill();
+      break;
+    case 8: // niño con pelo corto
+      c.beginPath(); c.ellipse(cx, hy - 8, hr + 4, hr, 0, Math.PI, 0); c.fill();
+      break;
+    case 9: // pelo largo recogido con pinza
+      c.beginPath(); c.ellipse(cx, hy - 6, hr + 4, hr * 1.06, 0, Math.PI, 0); c.fill();
+      c.beginPath(); c.ellipse(cx, hy + 30, 24, 40, 0, 0, Math.PI * 2); c.fill();
+      break;
+  }
+}
+
+function generateForeground(scene: Phaser.Scene) {
+  const W = 440, H = 480;
+  const armsFor = (v: number): ArmStyle => (['both', 'one', 'both', 'phone', 'both', 'one', 'both', 'one', 'both', 'phone'] as ArmStyle[])[v];
+  for (let v = 0; v < SIL_TYPES; v++) {
+    for (const up of [false, true]) {
+      const key = `silS${v}${up ? 'b' : 'a'}`;
+      if (scene.textures.exists(key)) scene.textures.remove(key);
+      const tex = scene.textures.createCanvas(key, W, H)!;
+      const c = tex.getContext();
+      // contraluz: la silueta clara un poco desplazada hacia arriba-izquierda y encima la oscura
+      c.fillStyle = '#121826'; c.strokeStyle = '#121826';
+      person(c, v, up ? armsFor(v) : null);
+      gaussianBlur(c, W, H, 9); // desenfoque de profundidad de campo
+      tex.refresh();
+      tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+    }
+  }
+  // hoja de palmera oscura y desenfocada en primer plano (esquina inferior)
+  {
+    const key = 'frondFg';
+    if (scene.textures.exists(key)) scene.textures.remove(key);
+    const fw = 560, fh = 420;
+    const tex = scene.textures.createCanvas(key, fw, fh)!;
+    const c = tex.getContext();
+    const stem: [number, number][] = [];
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40;
+      // tallo curvo desde la esquina inferior derecha hacia arriba-izquierda
+      stem.push([fw - 20 - t * 430 - Math.sin(t * 2.2) * 30, fh - 10 - t * 300 + t * t * 120]);
+    }
+    c.lineCap = 'round';
+    c.strokeStyle = '#1e3d24'; c.lineWidth = 10;
+    c.beginPath(); stem.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke();
+    c.fillStyle = '#244a2b';
+    for (let i = 2; i < stem.length - 1; i += 2) {
+      const [x0, y0] = stem[i], [x1, y1] = stem[i + 1];
+      const ang = Math.atan2(y1 - y0, x1 - x0);
+      const len = 175 * Math.sin((i / stem.length) * Math.PI * 0.95 + 0.1) + 40;
+      for (const sd of [-1, 1]) {
+        const a = ang + sd * 0.95;
+        const tx = x0 + Math.cos(a) * len, ty = y0 + Math.sin(a) * len + len * 0.55; // cuelgan por su peso
+        c.beginPath(); c.moveTo(x0, y0);
+        c.quadraticCurveTo(x0 + Math.cos(a - sd * 0.3) * len * 0.5, y0 + Math.sin(a - sd * 0.3) * len * 0.5, tx, ty);
+        c.quadraticCurveTo(x0 + Math.cos(a + sd * 0.2) * len * 0.45, y0 + Math.sin(a + sd * 0.2) * len * 0.45 + 6, x0 + Math.cos(ang) * 8, y0 + Math.sin(ang) * 8);
+        c.fill();
+      }
+    }
+    gaussianBlur(c, fw, fh, 7);
+    tex.refresh();
+    tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+  }
 }

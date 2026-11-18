@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { COURT, COLORS, HORIZON_Y, STAGE_CX, STAGE_W, project } from '../config';
 import { CAM_BASE_Y } from '../fx/CameraDirector';
+import { SIL_TYPES } from '../core/textures';
 import { PIXEL_FONT } from '../core/fonts';
 
 /**
@@ -24,6 +25,7 @@ export class BeachStage {
   excitement = 0; // 0..1
   private frondL!: Phaser.GameObjects.Image;
   private frondR!: Phaser.GameObjects.Image;
+  private frondBR!: Phaser.GameObjects.Image;
   private courtG!: Phaser.GameObjects.Graphics;
   private netG!: Phaser.GameObjects.Graphics;
   boardTexts: Phaser.GameObjects.Text[] = [];
@@ -187,14 +189,20 @@ export class BeachStage {
     this.layers[this.layers.length - 1].pinBottom = true; // siempre pegadas al borde inferior de la pantalla
     for (const row of [{ y: 832, sc: 0.4, n: 38, dx: 0 }, { y: 884, sc: 0.5, n: 28, dx: 60 }]) {
       for (let i = 0; i < row.n; i++) {
-        const v = Math.floor(Math.random() * 7);
+        const v = Math.floor(Math.random() * SIL_TYPES);
         const x = STAGE_CX - 1900 + row.dx + i * (3800 / row.n) + (Math.random() - 0.5) * 40;
         const y = row.y + Math.random() * 18;
-        const im = s.add.sprite(x, y, `silS${v}a`).setOrigin(0.5, 0.75).setScale(row.sc * (0.9 + Math.random() * 0.2)).setFlipX(Math.random() < 0.5);
+        const im = s.add.sprite(x, y, `silS${v}a`).setOrigin(0.5, 0.72).setScale(row.sc * 0.95 * (0.9 + Math.random() * 0.2)).setFlipX(Math.random() < 0.5);
         fgL.add(im);
         this.fg.push({ s: im, baseY: y, phase: Math.random() * 10, sign: false, amp: 2 + Math.random() * 3, up: 0, keyA: `silS${v}a`, keyB: `silS${v}b` });
       }
     }
+    // hoja de palmera oscura y desenfocada en la esquina inferior derecha (como en el vídeo)
+    const fgPalm = this.layer(1, 1, 650);
+    this.layers[this.layers.length - 1].screen = true;
+    this.frondBR = s.add.image(0, 0, 'frondFg').setOrigin(1, 1).setScale(0.9);
+    this.palms.push(this.frondBR);
+    fgPalm.add(this.frondBR);
     // banda de arena/sombra inferior para tapar el borde
     const band = s.add.graphics();
     band.fillStyle(0x121722, 1).fillRect(STAGE_CX - 2400, 860, 4800, 300);
@@ -404,8 +412,10 @@ export class BeachStage {
         // tamaño constante en pantalla, anclado a la esquina superior de la vista
         const W = this.scene.cameras.main.width;
         l.c.setPosition(camX, camY - halfH).setScale(1 / zoom);
+        const H = this.scene.cameras.main.height;
         this.frondL.setPosition(-W / 2 + 30, -40);
         this.frondR.setPosition(W / 2 - 30, -50);
+        this.frondBR.setPosition(W / 2 + 40, H + 20).setScale(0.82 * Math.min(1.4, H / 720));
         continue;
       }
       l.c.setPosition(tx, ty).setScale(c);
