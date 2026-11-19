@@ -30,7 +30,8 @@ fs.writeFileSync('dist/trimui/instalar.sh', fs.readFileSync('trimui/instalar.sh'
 if (fs.existsSync('trimui/build/jsgl-deps-arm64.tar.gz')) fs.copyFileSync('trimui/build/jsgl-deps-arm64.tar.gz', 'dist/trimui/jsgl-deps-arm64.tar.gz');
 else console.warn('aviso: falta trimui/build/jsgl-deps-arm64.tar.gz (genéralo con trimui/tools/deps.sh)');
 fs.copyFileSync('trimui/LEEME.txt', 'dist/trimui/LEEME.txt');
-fs.writeFileSync('dist/trimui/index.html', fs.readFileSync('trimui/web/index.html', 'utf8').replaceAll('__URL__', url).replaceAll('__VER__', VER));
+// sin un segundo index.html en el sitio: evita que sustituya al del juego al publicar
+fs.writeFileSync('dist/trimui/consola.html', fs.readFileSync('trimui/web/index.html', 'utf8').replaceAll('__URL__', url).replaceAll('__VER__', VER));
 execSync(`cd dist/trimui && rm -f beachsports-trimui.zip && python3 -c "import zipfile,os;z=zipfile.ZipFile('beachsports-trimui.zip','w',zipfile.ZIP_DEFLATED);[z.write(os.path.join(r,f)) for r,_,fs in os.walk('beachsports') for f in fs];z.write('instalar.sh');z.write('LEEME.txt');z.close()"`);
 console.log('instalador:', url + '/instalar.sh');
 // copia lista para instalar desde GitHub (raw), sin desplegar hosting: trimui/release/

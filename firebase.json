@@ -62,6 +62,18 @@
           }
         ]
       }
+    ],
+    "redirects": [
+      {
+        "source": "/trimui",
+        "destination": "/trimui/consola.html",
+        "type": 301
+      },
+      {
+        "source": "/trimui/",
+        "destination": "/trimui/consola.html",
+        "type": 301
+      }
     ]
   },
   "firestore": {
