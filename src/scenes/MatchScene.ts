@@ -162,7 +162,8 @@ export class MatchScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ cámara
-  private baseZoom() { const c = this.cameras.main; return Math.max(c.width / VIEW_W, c.height / VIEW_H) * 1.4; }
+  /** Zoom base según la ALTURA: el campo se ve entero en cualquier pantalla (en las más anchas, más playa a los lados). */
+  private baseZoom() { const c = this.cameras.main; return Math.min(c.width / VIEW_W * 1.12, c.height / VIEW_H) * 1.4; }
 
   private updateCameraTargets() {
     const d = this.dir;

@@ -16,7 +16,7 @@
     :root { --bg: #8cc8f0; --ink: #ffffff; --panel: #1d2a3a; }
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e1a28; } }
     :root[data-theme="dark"] { --bg: #0e1a28; }
-    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; overscroll-behavior: none;
+    html, body { margin: 0; height: 100%; width: 100%; position: fixed; inset: 0; background: #000; overflow: hidden; overscroll-behavior: none;
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
     /* la caja del juego ocupa SÓLO la zona segura (sin la muesca/cámara): Phaser mide la caja entera,
        así que no se puede usar padding (desplazaba el lienzo y lo cortaba por la derecha) */
@@ -33,6 +33,29 @@
 </head>
 <body>
   <div id="game"></div>
+  <div id="safe-probe" style="position:fixed;visibility:hidden;pointer-events:none;top:var(--safe-t);right:var(--safe-r);bottom:var(--safe-b);left:var(--safe-l)"></div>
+  <script>
+    // Ajuste a la pantalla visible real (iPhone): tamaño de la vista visible menos las zonas seguras.
+    // iOS avisa del giro antes de tener las medidas nuevas: se recalcula varias veces y se avisa a Phaser.
+    (function () {
+      var game = document.getElementById('game'), probe = document.getElementById('safe-probe');
+      function fit() {
+        var vv = window.visualViewport, W = vv ? vv.width : window.innerWidth, H = vv ? vv.height : window.innerHeight;
+        var cs = getComputedStyle(probe), l = parseFloat(cs.left) || 0, r = parseFloat(cs.right) || 0, t = parseFloat(cs.top) || 0, b = parseFloat(cs.bottom) || 0;
+        window.scrollTo(0, 0);
+        game.style.left = l + 'px'; game.style.top = t + 'px'; game.style.right = 'auto'; game.style.bottom = 'auto';
+        game.style.width = Math.max(1, Math.round(W - l - r)) + 'px'; game.style.height = Math.max(1, Math.round(H - t - b)) + 'px';
+        var g = window.__game; if (g && g.scale) g.scale.refresh();
+      }
+      function later() { fit(); [60, 250, 600, 1200].forEach(function (ms) { setTimeout(fit, ms); }); }
+      window.addEventListener('resize', later);
+      window.addEventListener('orientationchange', later);
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', later);
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) later(); });
+      window.__fitScreen = later;
+      later();
+    })();
+  </script>
   <div id="rotate"><div class="phone"></div>Gira el móvil para jugar</div>
   <script type="module" src="/src/main.ts"></script>
 </body>

@@ -45,6 +45,7 @@ document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: fal
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 (window as any).__game = game;
 (window as any).__inp = playerInput;
-(window as any).__view = view; // usado por la herramienta que hornea los decorados de la edición TrimUI
+(window as any).__view = view;
+(window as any).__fitScreen?.(); // ajusta el lienzo a la zona visible real (ver index.html)
 import { getTournament } from './game/tournament';
 (window as any).__tour = getTournament;
